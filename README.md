@@ -1,4 +1,4 @@
-# F1 Pulse v1.7.0
+# F1 Pulse v1.8.0
 
 F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static hosting such as GitHub Pages.
 
@@ -69,7 +69,7 @@ F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA,
 - Direct links from comparison cards into existing driver and constructor profiles.
 
 
-## v1.7.0 — Scenario Calculator + My F1
+## v1.8.0 — Scenario Calculator + My F1
 
 ### Championship Scenario / Points Calculator
 - Compare two drivers in a hypothetical next-race result.
@@ -85,3 +85,28 @@ F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA,
 - Favorites remain saved while switching seasons.
 - Current-season/selected-season standings and venue context appear when the favorite is present in that season.
 - Favorite cards open the existing driver, constructor, and Circuit Intelligence views.
+
+
+## v1.8.0 — Records & Fan Picks
+
+### F1 Records & Milestones Center
+- All-time Grand Prix win leaders
+- All-time podium leaders
+- All-time pole-position leaders
+- Drivers' championship title leaders
+- Constructor race-win leaders
+- Constructors' championship title leaders
+- Selected-season milestone cards
+- Historical record data lazy-loads only when Records is opened and is cached locally for seven days
+- Early-era qualifying coverage may be incomplete in the source data and is labeled accordingly
+
+### Race Predictor / Fan Picks
+- Pick P1, P2 and P3 for the next current-season Grand Prix
+- Duplicate-driver validation
+- Picks are editable until the scheduled race start, then locked
+- Predictions persist in browser localStorage with no account or backend
+- Season prediction history
+- Automatic post-race scoring from published classifications
+- Scoring: 3 points for exact podium position, 1 point for a podium driver in the wrong position, maximum 9 points
+- Prediction scorecard tracks saved picks, scored races, total points and best result
+
