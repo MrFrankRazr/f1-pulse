@@ -767,62 +767,76 @@ setInterval(()=>{renderNextRace(); if($('#view-live')?.classList.contains('activ
 loadData();
 
 // v1.8.0 — Records & Milestones + Race Predictor
-const RECORDS_CACHE_KEY='f1pulse-records-v2';
+const RECORDS_CACHE_KEY='f1pulse-records-v3';
 const PICKS_KEY='f1pulse-race-picks-v1';
+const RECORDS_SNAPSHOT_DATE='2026-08-26';
 state.records={loaded:false,loading:false,data:null};
 state.predictor={p1:null,p2:null,p3:null};
 
 function safeLocalGet(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}}
 function safeLocalSet(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}}
-function countRecord(items,idFn,labelFn){
-  const m=new Map();
-  items.forEach(item=>{const id=idFn(item);if(!id)return;const prev=m.get(id)||{id,label:labelFn(item),value:0};prev.value++;m.set(id,prev)});
-  return [...m.values()].sort((a,b)=>b.value-a.value||a.label.localeCompare(b.label));
-}
 function rankRecordRows(items,suffix=''){
   if(!items?.length)return '<p class="no-results">Record data unavailable.</p>';
   return items.slice(0,10).map((x,i)=>`<div class="record-rank-row"><span>${i+1}</span><div><strong>${esc(x.label)}</strong>${x.sub?`<small>${esc(x.sub)}</small>`:''}</div><b>${esc(x.value)}${esc(suffix)}</b></div>`).join('');
 }
-function standingsLists(data){return data?.MRData?.StandingsTable?.StandingsLists||[]}
+
+// All-time leaderboards use a verified embedded snapshot rather than dozens of
+// browser-side historical API calls. Selected-season milestones below remain live.
+const ALL_TIME_RECORDS={
+  driverWins:[
+    ['hamilton','Lewis Hamilton',106],['michael_schumacher','Michael Schumacher',91],['max_verstappen','Max Verstappen',71],
+    ['vettel','Sebastian Vettel',53],['prost','Alain Prost',51],['senna','Ayrton Senna',41],['alonso','Fernando Alonso',32],
+    ['mansell','Nigel Mansell',31],['stewart','Jackie Stewart',27],['clark','Jim Clark',25]
+  ],
+  podiums:[
+    ['hamilton','Lewis Hamilton',207],['michael_schumacher','Michael Schumacher',155],['max_verstappen','Max Verstappen',131],
+    ['vettel','Sebastian Vettel',122],['prost','Alain Prost',106],['alonso','Fernando Alonso',106],['raikkonen','Kimi Räikkönen',103],
+    ['senna','Ayrton Senna',80],['barrichello','Rubens Barrichello',68],['bottas','Valtteri Bottas',67]
+  ],
+  poles:[
+    ['hamilton','Lewis Hamilton',104],['michael_schumacher','Michael Schumacher',68],['senna','Ayrton Senna',65],
+    ['vettel','Sebastian Vettel',57],['max_verstappen','Max Verstappen',48],['clark','Jim Clark',33],['prost','Alain Prost',33],
+    ['mansell','Nigel Mansell',32],['rosberg','Nico Rosberg',30],['fangio','Juan Manuel Fangio',29]
+  ],
+  driverTitles:[
+    ['michael_schumacher','Michael Schumacher',7],['hamilton','Lewis Hamilton',7],['fangio','Juan Manuel Fangio',5],
+    ['prost','Alain Prost',4],['vettel','Sebastian Vettel',4],['max_verstappen','Max Verstappen',4],
+    ['brabham','Jack Brabham',3],['stewart','Jackie Stewart',3],['lauda','Niki Lauda',3],['piquet','Nelson Piquet',3],['senna','Ayrton Senna',3]
+  ],
+  teamWins:[
+    ['ferrari','Ferrari',250],['mclaren','McLaren',205],['mercedes','Mercedes',139],['red_bull','Red Bull',130],
+    ['williams','Williams',114],['team_lotus','Lotus',81],['brabham','Brabham',35],['renault','Renault',35],
+    ['benetton','Benetton',27],['tyrrell','Tyrrell',23]
+  ],
+  teamTitles:[
+    ['ferrari','Ferrari',16],['mclaren','McLaren',10],['williams','Williams',9],['mercedes','Mercedes',8],
+    ['team_lotus','Lotus',7],['red_bull','Red Bull',6],['cooper','Cooper',2],['brabham','Brabham',2],
+    ['renault','Renault',2],['vanwall','Vanwall',1]
+  ]
+};
+function normalizeRecordSnapshot(){
+  const mapRows=rows=>rows.map(([id,label,value])=>({id,label,value}));
+  return Object.fromEntries(Object.entries(ALL_TIME_RECORDS).map(([k,rows])=>[k,mapRows(rows)]));
+}
 async function loadRecords(force=false){
   if(state.records.loading)return;
   if(state.records.loaded&&!force){renderRecords();return}
   state.records.loading=true;
-  const hero=$('#recordsHero');if(hero)hero.innerHTML='<div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div>';
+  const hero=$('#recordsHero');
+  if(hero)hero.innerHTML='<div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div>';
   try{
-    const cached=safeLocalGet(RECORDS_CACHE_KEY,null);
-    if(cached&&!force&&Date.now()-Number(cached.savedAt||0)<7*864e5){state.records.data=cached.data;state.records.loaded=true;renderRecords();return}
-    const [winsR,p2R,p3R,polesR]=await Promise.allSettled([
-      getPagedRaces('results/1.json','Results'),getPagedRaces('results/2.json','Results'),getPagedRaces('results/3.json','Results'),
-      getPagedRaces('grid/1/results.json','Results')
-    ]);
-    if(winsR.status!=='fulfilled')throw winsR.reason;
-    const wins=winsR.value.flatMap(r=>(r.Results||[]).map(result=>({race:r,result})));
-    const podiumItems=[winsR,p2R,p3R].flatMap(x=>x.status==='fulfilled'?x.value.flatMap(r=>(r.Results||[]).map(result=>({race:r,result}))):[]);
-    const poleItems=polesR.status==='fulfilled'?polesR.value.flatMap(r=>(r.Results||[]).map(result=>({race:r,result}))):[];
-    const driverWins=countRecord(wins,x=>x.result.Driver?.driverId,x=>`${x.result.Driver?.givenName||''} ${x.result.Driver?.familyName||''}`.trim());
-    const podiums=countRecord(podiumItems,x=>x.result.Driver?.driverId,x=>`${x.result.Driver?.givenName||''} ${x.result.Driver?.familyName||''}`.trim());
-    const poles=countRecord(poleItems,x=>x.result.Driver?.driverId,x=>`${x.result.Driver?.givenName||''} ${x.result.Driver?.familyName||''}`.trim());
-    const teamWins=countRecord(wins,x=>x.result.Constructor?.constructorId,x=>x.result.Constructor?.name||'Unknown');
-    // Jolpica championship standings are season-scoped; there is no supported all-seasons
-    // position-1 standings endpoint. Keep a compact canonical baseline through 2025 instead
-    // of issuing ~150 season-by-season requests whenever the Records cache expires.
-    const driverTitles=[
-      ['hamilton','Lewis Hamilton',7],['michael_schumacher','Michael Schumacher',7],['fangio','Juan Manuel Fangio',5],
-      ['prost','Alain Prost',4],['vettel','Sebastian Vettel',4],['max_verstappen','Max Verstappen',4],
-      ['brabham','Jack Brabham',3],['lauda','Niki Lauda',3],['piquet','Nelson Piquet',3],['senna','Ayrton Senna',3],['stewart','Jackie Stewart',3],
-      ['ascari','Alberto Ascari',2],['alonso','Fernando Alonso',2],['clark','Jim Clark',2],['emerson_fittipaldi','Emerson Fittipaldi',2],
-      ['graham_hill','Graham Hill',2],['hakkinen','Mika Häkkinen',2],['norris','Lando Norris',1]
-    ].map(([id,label,value])=>({id,label,value})).sort((a,b)=>b.value-a.value||a.label.localeCompare(b.label));
-    const teamTitles=[
-      ['ferrari','Ferrari',16],['mclaren','McLaren',10],['williams','Williams',9],['mercedes','Mercedes',8],
-      ['team_lotus','Lotus',7],['red_bull','Red Bull',6],['brabham','Brabham',2],['cooper','Cooper',2],['renault','Renault',2],
-      ['benetton','Benetton',1],['brawn','Brawn',1],['brm','BRM',1],['matra','Matra',1],['tyrrell','Tyrrell',1],['vanwall','Vanwall',1]
-    ].map(([id,label,value])=>({id,label,value})).sort((a,b)=>b.value-a.value||a.label.localeCompare(b.label));
-    const data={driverWins,podiums,poles,driverTitles,teamWins,teamTitles};
-    state.records.data=data;state.records.loaded=true;safeLocalSet(RECORDS_CACHE_KEY,{savedAt:Date.now(),data});renderRecords();
-  }catch(err){console.error('Records load failed',err);['#recordWins','#recordPodiums','#recordPoles','#recordDriverTitles','#recordTeamWins','#recordTeamTitles'].forEach(sel=>{const el=$(sel);if(el)el.innerHTML='<p class="no-results">Historical record data is temporarily unavailable.</p>'});if(hero)hero.innerHTML='<div class="error-box"><b>Records unavailable.</b>Season data and the rest of F1 Pulse remain available.</div>'}
-  finally{state.records.loading=false}
+    // v3 intentionally does not depend on all-time API pagination. This prevents
+    // throttling/CORS/transient failures from blanking the Records Center.
+    const data=normalizeRecordSnapshot();
+    state.records.data=data;
+    state.records.loaded=true;
+    safeLocalSet(RECORDS_CACHE_KEY,{savedAt:Date.now(),snapshotDate:RECORDS_SNAPSHOT_DATE,data});
+    renderRecords();
+  }catch(err){
+    console.error('Records load failed',err);
+    ['#recordWins','#recordPodiums','#recordPoles','#recordDriverTitles','#recordTeamWins','#recordTeamTitles'].forEach(sel=>{const el=$(sel);if(el)el.innerHTML='<p class="no-results">Historical record data is temporarily unavailable.</p>'});
+    if(hero)hero.innerHTML='<div class="error-box"><b>Records unavailable.</b>Season data and the rest of F1 Pulse remain available.</div>';
+  }finally{state.records.loading=false}
 }
 function seasonLeader(kind){
   const races=allRaceItems(),quali=allQualiItems();

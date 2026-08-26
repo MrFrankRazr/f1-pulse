@@ -1,4 +1,4 @@
-# F1 Pulse v1.8.1
+# F1 Pulse v1.8.2
 
 F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static hosting such as GitHub Pages.
 
@@ -117,3 +117,10 @@ F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA,
 - Corrected all-time pole loading to use Grand Prix grid-position-1 results.
 - Replaced unsupported global championship-standings calls with a compact canonical Drivers’ and Constructors’ title baseline through the completed 2025 season.
 - Bumped the Records local cache key so browsers discard the incomplete v1.8.0 Records cache automatically.
+
+
+## v1.8.2 Records reliability update
+- Replaced fragile browser-side all-time pagination with an embedded verified all-time records snapshot dated 2026-08-26.
+- Selected-season Records milestones remain live from Jolpica.
+- Bumped Records cache to v3 and page assets to v1.8.2.
+- Prevents a single historical API failure from blanking all six Records panels.
