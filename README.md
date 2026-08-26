@@ -1,4 +1,4 @@
-# F1 Pulse v1.8.0
+# F1 Pulse v1.8.1
 
 F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static hosting such as GitHub Pages.
 
@@ -69,7 +69,7 @@ F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA,
 - Direct links from comparison cards into existing driver and constructor profiles.
 
 
-## v1.8.0 — Scenario Calculator + My F1
+## v1.8.1 — Scenario Calculator + My F1
 
 ### Championship Scenario / Points Calculator
 - Compare two drivers in a hypothetical next-race result.
@@ -87,7 +87,7 @@ F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA,
 - Favorite cards open the existing driver, constructor, and Circuit Intelligence views.
 
 
-## v1.8.0 — Records & Fan Picks
+## v1.8.1 — Records & Fan Picks
 
 ### F1 Records & Milestones Center
 - All-time Grand Prix win leaders
@@ -110,3 +110,10 @@ F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA,
 - Scoring: 3 points for exact podium position, 1 point for a podium driver in the wrong position, maximum 9 points
 - Prediction scorecard tracks saved picks, scored races, total points and best result
 
+
+
+## v1.8.1 Records reliability fix
+
+- Corrected all-time pole loading to use Grand Prix grid-position-1 results.
+- Replaced unsupported global championship-standings calls with a compact canonical Drivers’ and Constructors’ title baseline through the completed 2025 season.
+- Bumped the Records local cache key so browsers discard the incomplete v1.8.0 Records cache automatically.
