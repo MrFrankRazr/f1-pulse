@@ -94,6 +94,14 @@
     <p id="lastUpdated">Waiting for data…</p>
   </footer>
 
+  <div class="race-modal" id="raceModal" aria-hidden="true">
+    <div class="race-modal-backdrop" data-close-race-modal></div>
+    <section class="race-modal-panel" role="dialog" aria-modal="true" aria-labelledby="raceModalTitle">
+      <button class="modal-close" type="button" aria-label="Close race weekend" data-close-race-modal>×</button>
+      <div id="raceModalContent"><div class="skeleton tall"></div></div>
+    </section>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="app.js" defer></script>
 </body>

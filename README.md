@@ -57,3 +57,14 @@ This is an unofficial fan dashboard and is not affiliated with Formula 1, FIA, t
 6. GitHub Pages will publish the site at a URL similar to `https://YOUR-USERNAME.github.io/f1-pulse/`.
 
 The application is static and requires no server-side runtime, database, secret, or API key.
+
+## Race Weekend Hub
+
+Each race now opens an on-demand Weekend Hub with:
+- Practice, qualifying, sprint and race session schedule (when present on the official season feed)
+- Localized session times in the visitor's browser timezone
+- Race, qualifying and sprint classifications when available
+- Circuit location and coordinates
+- Direct venue map access
+
+Detailed session classifications are fetched only when a visitor opens a race weekend, keeping the initial page load lightweight.
