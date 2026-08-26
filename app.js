@@ -1,6 +1,6 @@
 const API = 'https://api.jolpi.ca/ergast/f1';
 const CURRENT_YEAR = new Date().getFullYear();
-const state = { drivers: [], teams: [], races: [], winners: [], season: CURRENT_YEAR, filter: 'all', trendType: 'drivers', analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map(), circuitCache: new Map() };
+const state = { drivers: [], teams: [], races: [], winners: [], season: CURRENT_YEAR, filter: 'all', trendType: 'drivers', analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map(), circuitCache: new Map(), liveCenter: { weatherCache: new Map(), lastRound: null } };
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
@@ -261,9 +261,9 @@ function renderAnalytics(){
 }
 
 function renderSeasonLabels(){
-  $('#seasonLabel').textContent=`${state.season} SEASON`; ['driver','team','trend','winner','calendar','circuit'].forEach(x=>$(`#${x}SeasonChip`).textContent=state.season);
+  $('#seasonLabel').textContent=`${state.season} SEASON`; ['live','driver','team','trend','winner','calendar','circuit'].forEach(x=>{ const el=$(`#${x}SeasonChip`); if(el) el.textContent=state.season; });
 }
-function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderAnalytics();renderWinners();renderLatestPodium();renderCalendar();renderCircuits(); }
+function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderAnalytics();renderWinners();renderLatestPodium();renderCalendar();renderCircuits(); if($('#view-live')?.classList.contains('active')) renderLiveCenter(false); }
 function showError(err){
   setStatus('error','Offline'); toast('Unable to refresh live F1 data');
   const msg=`<div class="error-box"><b>Live data is temporarily unavailable.</b>${esc(err.message)}. Check your connection or try Refresh Data.</div>`;
@@ -289,18 +289,22 @@ async function loadData(manual=false){
   }catch(err){ console.error(err); showError(err); }
 }
 function switchView(name){
-  $$('.view').forEach(v=>v.classList.toggle('active',v.dataset.viewPanel===name)); function initSeasonSelector(){
+  $$('.view').forEach(v=>v.classList.toggle('active',v.dataset.viewPanel===name));
+  $$('.nav-link').forEach(n=>n.classList.toggle('active',n.dataset.view===name));
+  if(name==='live') renderLiveCenter(false);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function initSeasonSelector(){
   const select=$('#seasonSelect'); if(!select) return;
   select.innerHTML=Array.from({length:CURRENT_YEAR-1949},(_,i)=>CURRENT_YEAR-i).map(y=>`<option value="${y}" ${y===state.season?'selected':''}>${y}${y===CURRENT_YEAR?' · Current':''}</option>`).join('');
   select.addEventListener('change',()=>{
-    state.season=Number(select.value); state.filter='all'; state.weekendCache.clear(); state.profileCache.clear();
+    state.season=Number(select.value); state.filter='all'; state.weekendCache.clear(); state.profileCache.clear(); state.circuitCache.clear(); state.liveCenter.lastRound=null;
     $$('.filter-btn').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));
     loadData(false); switchView('home');
   });
 }
 initSeasonSelector();
-$$('.nav-link').forEach(n=>n.classList.toggle('active',n.dataset.view===name)); window.scrollTo({top:0,behavior:'smooth'});
-}
 
 function calcAge(dob){
   if(!dob) return '—';
@@ -379,6 +383,119 @@ function closeProfile(){
   if(!$('#raceModal').classList.contains('open')&&!$('#circuitModal').classList.contains('open')) document.body.classList.remove('modal-open');
 }
 
+function sessionDurationMs(type){
+  if(type==='race') return 2.5*36e5;
+  if(type==='sprint') return 55*60*1000;
+  if(type==='qualifying') return 75*60*1000;
+  return 70*60*1000;
+}
+function focusRace(){
+  if(!state.races.length) return null;
+  if(state.season!==CURRENT_YEAR) return state.races.at(-1);
+  const now=Date.now();
+  const active=state.races.find(r=>{
+    const ss=raceSessions(r); if(!ss.length) return false;
+    const first=ss[0].date.getTime()-6*36e5, last=raceDateTime(r).getTime()+5*36e5;
+    return now>=first && now<=last;
+  });
+  return active || upcomingRace() || latestCompletedRace() || state.races[0];
+}
+function liveSessionState(s){
+  const now=Date.now(), start=s.date.getTime(), end=start+sessionDurationMs(s.type);
+  if(now>=start && now<=end) return 'live';
+  if(now>end) return 'complete';
+  if(start-now<=36e5) return 'soon';
+  return 'upcoming';
+}
+function durationLabel(ms){
+  if(ms<=0) return 'NOW';
+  const d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),m=Math.floor(ms%36e5/6e4);
+  return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${Math.max(1,m)}m`;
+}
+function weatherText(code){
+  if(code===0) return 'Clear'; if([1,2].includes(code)) return 'Partly cloudy'; if(code===3) return 'Overcast';
+  if([45,48].includes(code)) return 'Fog'; if([51,53,55,56,57].includes(code)) return 'Drizzle';
+  if([61,63,65,66,67,80,81,82].includes(code)) return 'Rain'; if([71,73,75,77,85,86].includes(code)) return 'Snow';
+  if([95,96,99].includes(code)) return 'Thunderstorms'; return 'Variable';
+}
+function cToF(c){ return Number.isFinite(c)?Math.round(c*9/5+32):null; }
+async function getWeekendWeather(r){
+  if(state.season!==CURRENT_YEAR) return {archive:true};
+  const loc=r?.Circuit?.Location; if(!loc) return null;
+  const key=`${r.round}-${r.date}`; if(state.liveCenter.weatherCache.has(key)) return state.liveCenter.weatherCache.get(key);
+  const target=raceDateTime(r).getTime(), delta=target-Date.now();
+  if(delta > 16*864e5 || delta < -2*864e5) return {outOfRange:true};
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(loc.lat)}&longitude=${encodeURIComponent(loc.long)}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m&timezone=UTC&forecast_days=16&temperature_unit=celsius&wind_speed_unit=kmh`;
+  const res=await fetch(url,{cache:'no-store'}); if(!res.ok) throw new Error(`Weather service returned ${res.status}`);
+  const data=await res.json(); state.liveCenter.weatherCache.set(key,data); return data;
+}
+function weatherAt(data,date){
+  if(!data?.hourly?.time?.length) return null;
+  const t=date.getTime(); let best=0,bestDiff=Infinity;
+  data.hourly.time.forEach((v,i)=>{const ms=new Date(`${v}Z`).getTime(),diff=Math.abs(ms-t);if(diff<bestDiff){best=i;bestDiff=diff;}});
+  return {time:data.hourly.time[best],temp:data.hourly.temperature_2m?.[best],humidity:data.hourly.relative_humidity_2m?.[best],rain:data.hourly.precipitation_probability?.[best],code:data.hourly.weather_code?.[best],wind:data.hourly.wind_speed_10m?.[best],gust:data.hourly.wind_gusts_10m?.[best]};
+}
+function renderLiveTimeline(r){
+  const host=$('#liveSessionTimeline'); if(!host) return;
+  const ss=raceSessions(r), now=Date.now();
+  host.innerHTML=`<div class="live-timeline">${ss.map(s=>{const st=liveSessionState(s),until=s.date.getTime()-now;return `<div class="live-session-row ${st}"><span class="live-session-light"></span><div><strong>${esc(s.label)}</strong><small>${esc(fmtSession(s.date))}</small></div><em>${st==='live'?'SESSION WINDOW':st==='complete'?'COMPLETE':st==='soon'?`IN ${durationLabel(until)}`:`IN ${durationLabel(until)}`}</em></div>`}).join('')}</div>`;
+}
+function latestClassificationData(r,data){
+  const candidates=[];
+  if(data?.race?.Results?.length) candidates.push({label:'Race',items:data.race.Results,mode:'race',weight:4});
+  if(data?.sprint?.SprintResults?.length) candidates.push({label:'Sprint',items:data.sprint.SprintResults,mode:'race',weight:3});
+  if(data?.qualifying?.QualifyingResults?.length) candidates.push({label:'Qualifying',items:data.qualifying.QualifyingResults,mode:'qualifying',weight:2});
+  return candidates.sort((a,b)=>b.weight-a.weight)[0]||null;
+}
+function liveFastestLap(items){
+  return (items||[]).find(x=>String(x.FastestLap?.rank)==='1') || null;
+}
+function renderLiveStory(r,data,weather){
+  const host=$('#liveWeekendStory'); if(!host) return;
+  const leader=state.drivers[0], second=state.drivers[1], gap=leader&&second?(Number(leader.points)-Number(second.points)).toFixed(0):null;
+  const prior=state.winners.filter(x=>Number(x.round)<Number(r.round)).at(-1), priorWinner=prior?.Results?.[0];
+  const raceItems=data?.race?.Results||[], fast=liveFastestLap(raceItems), raceWeather=weatherAt(weather,raceDateTime(r));
+  const bullets=[];
+  if(leader) bullets.push(`<li><span>Championship</span><strong>${esc(driverFullName(leader))} leads${gap!==null?` by ${esc(gap)} points`:''}.</strong></li>`);
+  if(priorWinner) bullets.push(`<li><span>Last race</span><strong>${esc(priorWinner.Driver.givenName)} ${esc(priorWinner.Driver.familyName)} won the ${esc(prior.raceName)}.</strong></li>`);
+  bullets.push(`<li><span>Format</span><strong>${r.Sprint?'Sprint weekend with an extra points-paying race.':'Standard Grand Prix weekend.'}</strong></li>`);
+  if(fast) bullets.push(`<li><span>Fastest lap</span><strong>${esc(fast.Driver.givenName)} ${esc(fast.Driver.familyName)} · ${esc(fast.FastestLap?.Time?.time||'—')}.</strong></li>`);
+  if(raceWeather) bullets.push(`<li><span>Race forecast</span><strong>${esc(weatherText(raceWeather.code))}, ${esc(Math.round(raceWeather.temp))}°C / ${esc(cToF(raceWeather.temp))}°F, ${esc(raceWeather.rain??'—')}% rain chance.</strong></li>`);
+  host.innerHTML=`<ul class="weekend-story-list">${bullets.join('')}</ul>`;
+}
+async function renderLiveWeather(r,weatherPromise){
+  const host=$('#liveWeather'); if(!host) return;
+  try{
+    const data=await weatherPromise;
+    if(data?.archive){host.innerHTML='<div class="weather-unavailable"><strong>Historical season</strong><p>Forecast weather is only shown for the current season.</p></div>';return data;}
+    if(data?.outOfRange){host.innerHTML='<div class="weather-unavailable"><strong>Forecast window not open yet</strong><p>Weather will populate automatically when the race falls inside the forecast horizon.</p></div>';return data;}
+    const sessions=raceSessions(r).filter(s=>['qualifying','sprint','race'].includes(s.type));
+    host.innerHTML=`<div class="weather-grid">${sessions.map(s=>{const w=weatherAt(data,s.date); if(!w) return ''; return `<article class="weather-card"><small>${esc(s.label)}</small><strong>${esc(Math.round(w.temp))}°C <span>${esc(cToF(w.temp))}°F</span></strong><p>${esc(weatherText(w.code))}</p><div><span>Rain <b>${esc(w.rain??'—')}%</b></span><span>Wind <b>${esc(Math.round(w.wind??0))} km/h</b></span><span>Humidity <b>${esc(w.humidity??'—')}%</b></span></div></article>`}).join('')}</div><p class="weather-source-note">Forecast: Open-Meteo · circuit coordinates · updated on page request.</p>`;
+    return data;
+  }catch(err){ host.innerHTML='<div class="weather-unavailable"><strong>Weather temporarily unavailable</strong><p>Race data remains available.</p></div>'; return null; }
+}
+async function renderLiveCenter(force=false){
+  const hero=$('#liveCenterHero'); if(!hero || !state.races.length) return;
+  const r=focusRace(); if(!r){hero.innerHTML='<div class="error-box">No race weekend is available for this season.</div>';return;}
+  const ss=raceSessions(r), now=Date.now(), live=ss.find(s=>liveSessionState(s)==='live'), next=ss.find(s=>s.date.getTime()>now), completed=[...ss].reverse().find(s=>s.date.getTime()<=now);
+  const focus=live||next||completed, loc=r.Circuit.Location;
+  state.liveCenter.lastRound=r.round;
+  hero.innerHTML=`<div class="live-hero-copy"><div class="live-badge ${live?'hot':''}"><span></span>${live?'SESSION WINDOW':'RACE WEEKEND CENTER'}</div><p class="eyebrow">${esc(state.season)} · ROUND ${esc(r.round)}</p><h2>${esc(r.raceName)}</h2><p>${esc(r.Circuit.circuitName)} · ${esc(loc.locality)}, ${esc(loc.country)}</p><div class="live-focus-session"><small>${live?'CURRENT WINDOW':next?'NEXT SESSION':'LATEST SESSION'}</small><strong>${esc(focus?.label||'Race Weekend')}</strong><span>${focus?esc(fmtSession(focus.date)):'—'}${next&&!live?` · ${esc(durationLabel(next.date.getTime()-now))} away`:''}</span></div></div><div class="live-hero-actions"><button class="primary-btn" type="button" data-race-round="${esc(r.round)}">Open full weekend</button><button class="ghost-btn" type="button" data-circuit-id="${esc(r.Circuit.circuitId)}">Circuit intel</button></div>`;
+  renderLiveTimeline(r);
+  const classification=$('#liveClassification'); classification.innerHTML='<div class="skeleton tall"></div>';
+  const weatherPromise=getWeekendWeather(r);
+  const weatherRender=renderLiveWeather(r,weatherPromise);
+  try{
+    if(force) state.weekendCache.delete(`${state.season}-${r.round}`);
+    const data=await getWeekendData(r.round), latest=latestClassificationData(r,data);
+    if(latest){
+      const fast=latest.label==='Race'?liveFastestLap(latest.items):null;
+      classification.innerHTML=`<div class="classification-head"><span class="live-data-chip">${esc(latest.label.toUpperCase())}</span><small>Latest published classification</small></div>${resultRows(latest.items,latest.mode)}${fast?`<div class="fastest-lap-callout"><span>FASTEST LAP</span><strong>${esc(fast.Driver.givenName)} ${esc(fast.Driver.familyName)}</strong><em>${esc(fast.FastestLap?.Time?.time||'—')}</em></div>`:''}`;
+    }else classification.innerHTML='<div class="weather-unavailable"><strong>No classification published yet</strong><p>This panel updates as Jolpica publishes qualifying, sprint or race results.</p></div>';
+    const weather=await weatherRender; renderLiveStory(r,data,weather);
+  }catch(err){ classification.innerHTML='<div class="error-box"><b>Weekend classification unavailable.</b>Try Refresh Center shortly.</div>'; const weather=await weatherRender; renderLiveStory(r,{},weather); }
+}
+
 function resultRows(items, mode='race'){
   if(!items?.length) return '<p class="no-results">Results will appear here after the session is completed.</p>';
   return `<div class="weekend-results">${items.slice(0,10).map(x=>{
@@ -431,19 +548,10 @@ function closeRaceWeekend(){
   const modal=$('#raceModal'); modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); if(!$('#profileModal').classList.contains('open')&&!$('#circuitModal').classList.contains('open')) document.body.classList.remove('modal-open');
 }
 
-function initSeasonSelector(){
-  const select=$('#seasonSelect'); if(!select) return;
-  select.innerHTML=Array.from({length:CURRENT_YEAR-1949},(_,i)=>CURRENT_YEAR-i).map(y=>`<option value="${y}" ${y===state.season?'selected':''}>${y}${y===CURRENT_YEAR?' · Current':''}</option>`).join('');
-  select.addEventListener('change',()=>{
-    state.season=Number(select.value); state.filter='all'; state.weekendCache.clear(); state.profileCache.clear();
-    $$('.filter-btn').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));
-    loadData(false); switchView('home');
-  });
-}
-initSeasonSelector();
 $$('.nav-link').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
 $$('.filter-btn').forEach(b=>b.addEventListener('click',()=>{state.filter=b.dataset.filter; $$('.filter-btn').forEach(x=>x.classList.toggle('active',x===b)); renderCalendar();}));
 $('#refreshBtn').addEventListener('click',()=>loadData(true));
+const liveRefresh=$('#liveCenterRefresh'); if(liveRefresh) liveRefresh.addEventListener('click',()=>{toast('Refreshing race weekend center…');renderLiveCenter(true);});
 document.addEventListener('click',(e)=>{
   const jump=e.target.closest('[data-jump]'); if(jump){ switchView(jump.dataset.jump); return; }
   const closeCircuitBtn=e.target.closest('[data-close-circuit-modal]'); if(closeCircuitBtn){ closeCircuit(); return; }
@@ -471,5 +579,5 @@ document.addEventListener('click',(e)=>{
   if(tab){ const root=tab.closest('section'); root.querySelectorAll('.result-tab').forEach(x=>x.classList.toggle('active',x===tab)); root.querySelectorAll('.result-panel').forEach(x=>x.classList.toggle('active',x.dataset.resultPanel===tab.dataset.resultTab)); }
 });
 document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ closeRaceWeekend(); closeProfile(); closeCircuit(); } });
-setInterval(renderNextRace,1000); setInterval(()=>{if(state.season===CURRENT_YEAR)loadData(false);},5*60*1000);
+setInterval(()=>{renderNextRace(); if($('#view-live')?.classList.contains('active')) renderLiveTimeline(focusRace()||{});},1000); setInterval(()=>{if(state.season===CURRENT_YEAR)loadData(false);},5*60*1000);
 loadData();

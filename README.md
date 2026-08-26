@@ -1,71 +1,60 @@
-# F1 Pulse
+# F1 Pulse v1.5.0
 
-F1 Pulse is a static Formula 1 fan dashboard designed for GitHub Pages. It uses the Jolpica F1 API for live/current-season and historical Formula 1 data.
+F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static hosting such as GitHub Pages.
 
-## v1.4.0
+## Core features
 
-### Historical season browser
-- Select any Formula 1 season from 1950 through the current year.
-- Driver standings, constructor standings, race winners, race calendar, trends, profiles and weekend classifications reload for the selected season.
-- The current season remains the default.
-- Historical seasons are marked as Archive data.
-- Era-aware handling is included for seasons before the Constructors' Championship began in 1958 and for years where qualifying/session data is not available.
+- Current and historical Formula 1 seasons (1950-current)
+- Driver and constructor standings
+- Driver and constructor profiles
+- Race winners and podiums
+- Race calendar and venue information
+- Race Weekend Hub with session schedule and published classifications
+- Championship trends, poles, fastest laps, podiums and recent-form analytics
+- Circuit Intelligence with historical venue records and derived track metrics
+- Live Race Weekend Center
 
-### Circuit Intelligence
-- New Circuits navigation view for every venue on the selected season calendar.
-- Circuit location and coordinates.
-- Historical number of recorded Formula 1 Grands Prix at the circuit.
-- First and most recent recorded Grand Prix.
-- Latest recorded winner.
-- Fastest recorded race lap available from Jolpica result data.
-- Estimated circuit length derived from fastest-lap average speed and lap time.
-- Estimated race distance derived from circuit length and winner lap count.
-- Direct venue map and circuit reference links.
+## Live Race Weekend Center (v1.5.0)
 
-Circuit length and race-distance values are deliberately labelled as estimates. Jolpica does not currently expose official circuit length as part of the Ergast-compatible circuit metadata, so F1 Pulse derives these values from recorded race data instead of hard-coding specifications.
+The Live Center focuses automatically on the active race weekend, or the next Grand Prix when no weekend is underway. It includes:
 
-## Existing features
-- Current driver and constructor standings
-- Race winners and championship leaders
-- Full race calendar and venues
-- Next Grand Prix countdown and session schedule
-- Race Weekend Hub with race, qualifying and sprint classifications
-- Driver profiles and constructor profiles
-- Championship trends and points progression
-- Pole, podium, fastest-lap and recent-form leaderboards
-- Automatic current-season refresh every five minutes
-- Responsive dark modern-blue F1 enthusiast interface
+- Weekend session timeline with local visitor times
+- Session-window / next-session status and countdown
+- Latest qualifying, sprint or race classification published by Jolpica
+- Race fastest-lap callout when available
+- Championship and recent-race story context
+- Circuit Intelligence and full Weekend Hub shortcuts
+- Coordinate-based qualifying/sprint/race weather forecast from Open-Meteo when the event is inside the available forecast horizon
+- Clear labeling that F1 Pulse is not an official real-time lap timing or telemetry service
 
-## Files
+## Data sources
 
-```text
-index.html
-app.js
-styles.css
-favicon.svg
-README.md
-```
+- Formula 1 data: Jolpica F1 API (Ergast-compatible API)
+- Weather: Open-Meteo Forecast API
 
-No build process, database, Node server or API key is required.
+No API keys are stored in this project.
+
+Circuit length and race-distance values shown in Circuit Intelligence are derived estimates when sufficient fastest-lap speed/time data exists. They are not official FIA specifications.
 
 ## GitHub Pages deployment
 
-1. Create or open your public `f1-pulse` GitHub repository.
-2. Place `index.html`, `app.js`, `styles.css`, `favicon.svg` and `README.md` in the repository root.
-3. Commit the files to `main`.
-4. Open **Settings > Pages**.
-5. Under **Build and deployment**, choose **Deploy from a branch**.
-6. Select `main` and `/ (root)`.
-7. Save.
+Place these files in the root of your repository:
 
-The site URL will normally be:
+- `index.html`
+- `app.js`
+- `styles.css`
+- `favicon.svg`
+- `README.md`
 
-```text
-https://YOUR-GITHUB-USERNAME.github.io/f1-pulse/
-```
+In GitHub:
 
-## Data source
+1. Open **Settings → Pages**.
+2. Set **Source** to **Deploy from a branch**.
+3. Select **main** and **/ (root)**.
+4. Save.
 
-F1 Pulse uses the Jolpica F1 API / Ergast-compatible endpoints at `https://api.jolpi.ca/ergast/f1/`.
+The site uses versioned assets (`styles.css?v=1.5.0` and `app.js?v=1.5.0`) to reduce stale browser/GitHub Pages caching after deployment.
 
-This is an independent fan project and is not affiliated with Formula 1, FIA, any Formula 1 team or any driver.
+## Notes
+
+F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA, any Formula 1 team, or any driver.

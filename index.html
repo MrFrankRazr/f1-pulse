@@ -7,7 +7,7 @@
   <meta name="description" content="F1 Pulse — current Formula 1 standings, results, winners, schedules and circuit information." />
   <title>F1 Pulse | Formula Racing Dashboard</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=1.4.0" />
+  <link rel="stylesheet" href="styles.css?v=1.5.0" />
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -18,6 +18,7 @@
     </a>
     <nav class="nav" aria-label="Primary navigation">
       <button class="nav-link active" data-view="home">Race Control</button>
+      <button class="nav-link" data-view="live">Live Center</button>
       <button class="nav-link" data-view="drivers">Drivers</button>
       <button class="nav-link" data-view="teams">Constructors</button>
       <button class="nav-link" data-view="trends">Trends</button>
@@ -69,6 +70,20 @@
         <button class="text-btn" data-jump="winners">Season winners →</button>
       </div>
       <div id="latestPodium" class="podium-wrap"><div class="skeleton tall"></div></div>
+    </section>
+
+    <section class="view content-view live-center-view" id="view-live" data-view-panel="live">
+      <div class="page-title live-center-title"><div><p class="eyebrow">RACE WEEKEND COMMAND</p><h1>Live Race Weekend Center</h1><p class="page-subtitle">Session clock, latest published classifications, circuit context and weather in one race-weekend view.</p></div><span class="season-chip" id="liveSeasonChip"></span></div>
+      <div id="liveCenterHero" class="live-center-hero"><div class="skeleton tall"></div></div>
+      <div class="live-center-grid">
+        <section class="analytics-panel live-session-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">SESSION CLOCK</p><h2>Weekend timeline</h2></div><button class="text-btn" id="liveCenterRefresh" type="button">Refresh center</button></div><div id="liveSessionTimeline"><div class="skeleton tall"></div></div></section>
+        <section class="analytics-panel weather-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">TRACK WEATHER</p><h2>Weekend conditions</h2></div></div><div id="liveWeather"><div class="skeleton tall"></div></div></section>
+      </div>
+      <div class="live-center-grid lower">
+        <section class="analytics-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">LATEST PUBLISHED DATA</p><h2>Classification</h2></div></div><div id="liveClassification"><div class="skeleton tall"></div></div></section>
+        <section class="analytics-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">WEEKEND STORY</p><h2>What matters now</h2></div></div><div id="liveWeekendStory"><div class="skeleton tall"></div></div></section>
+      </div>
+      <p class="live-data-note">F1 Pulse shows the latest classifications published by Jolpica. It does not claim to provide official real-time lap timing or telemetry.</p>
     </section>
 
     <section class="view content-view" id="view-drivers" data-view-panel="drivers">
@@ -159,6 +174,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=1.4.0" defer></script>
+  <script src="app.js?v=1.5.0" defer></script>
 </body>
 </html>
