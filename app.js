@@ -1,5 +1,6 @@
 const API = 'https://api.jolpi.ca/ergast/f1';
-const state = { drivers: [], teams: [], races: [], winners: [], season: new Date().getFullYear(), filter: 'all', trendType: 'drivers', analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map() };
+const CURRENT_YEAR = new Date().getFullYear();
+const state = { drivers: [], teams: [], races: [], winners: [], season: CURRENT_YEAR, filter: 'all', trendType: 'drivers', analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map(), circuitCache: new Map() };
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
@@ -82,7 +83,10 @@ function raceSessions(r){
 }
 function renderNextRace(){
   const r=upcomingRace(), el=$('#nextRaceCard');
-  if(!r){el.innerHTML='<p class="eyebrow">SEASON COMPLETE</p><h2>Chequered flag.</h2><p class="venue">The final race of the season has been completed.</p>';return;}
+  if(!r){
+    const champ=state.drivers[0];
+    el.innerHTML=`<p class="eyebrow">${state.season < CURRENT_YEAR?'ARCHIVE SEASON':'SEASON COMPLETE'}</p><h2>Chequered flag.</h2><p class="venue">${champ?`${esc(state.season)} Drivers' Champion · ${esc(driverFullName(champ))}`:'The final race of the season has been completed.'}</p>${state.season<CURRENT_YEAR?'<button class="weekend-btn" type="button" data-jump="winners">Explore season winners →</button>':''}`;return;
+  }
   const d=raceDateTime(r), [days,hrs,mins,secs]=countdown(d);
   const nextSession=raceSessions(r).find(s=>s.date.getTime()>Date.now());
   el.innerHTML=`<div class="race-kicker"><span>NEXT RACE</span><span class="round-badge">ROUND ${esc(r.round)}</span></div><h2>${esc(r.raceName)}</h2><p class="venue">${esc(r.Circuit.circuitName)} · ${esc(r.Circuit.Location.locality)}, ${esc(r.Circuit.Location.country)}</p><div class="countdown"><div><b>${days}</b><span>DAYS</span></div><div><b>${String(hrs).padStart(2,'0')}</b><span>HOURS</span></div><div><b>${String(mins).padStart(2,'0')}</b><span>MIN</span></div><div><b>${String(secs).padStart(2,'0')}</b><span>SEC</span></div></div><div class="race-time">${nextSession?`Next session · ${esc(nextSession.label)} · ${esc(fmtSession(nextSession.date))}`:`Race start · ${esc(fmtSession(d))}`}</div><button class="weekend-btn" type="button" data-race-round="${esc(r.round)}">Open Weekend Hub →</button>`;
@@ -94,12 +98,12 @@ function renderLeaderStrip(){
 function standingRows(items,type='driver',limit){
   return items.slice(0,limit||items.length).map(x=> type==='driver' ? `<button class="standing-row standing-link" type="button" data-driver-id="${esc(x.Driver.driverId)}"><div class="pos">${esc(x.position)}</div><div class="competitor"><b>${esc(driverFullName(x))}</b><small>${esc(constructorOfDriver(x))}</small></div><div class="points">${esc(x.points)}<small>PTS</small></div></button>` : `<button class="standing-row standing-link" type="button" data-constructor-id="${esc(x.Constructor.constructorId)}"><div class="pos">${esc(x.position)}</div><div class="competitor"><b>${esc(x.Constructor.name)}</b><small>${esc(x.Constructor.nationality)}</small></div><div class="points">${esc(x.points)}<small>PTS</small></div></button>`).join('');
 }
-function renderHomeStandings(){ $('#homeDrivers').innerHTML=standingRows(state.drivers,'driver',5); $('#homeTeams').innerHTML=standingRows(state.teams,'team',5); }
+function renderHomeStandings(){ $('#homeDrivers').innerHTML=standingRows(state.drivers,'driver',5)||'<p class="no-results">Driver standings unavailable for this season.</p>'; $('#homeTeams').innerHTML=standingRows(state.teams,'team',5)||(state.season<1958?`<p class="no-results">The Constructors' Championship began in 1958.</p>`:'<p class="no-results">Constructor standings unavailable.</p>'); }
 function renderDriverTable(){
   $('#driverTable').innerHTML=`<div class="table-row header"><span>Pos</span><span>Driver</span><span>Constructor</span><span>Wins</span><span>Points</span></div>`+state.drivers.map(d=>`<button class="table-row table-link" type="button" data-driver-id="${esc(d.Driver.driverId)}"><span class="num">${esc(d.position)}</span><span class="driver-name"><i class="team-accent" style="background:${teamColor(constructorOfDriver(d))}"></i>${esc(driverFullName(d))}<small>${esc(d.Driver.nationality)}</small></span><span>${esc(constructorOfDriver(d))}</span><span>${esc(d.wins)}</span><span class="points">${esc(d.points)}</span></button>`).join('');
 }
 function renderTeams(){
-  $('#teamCards').innerHTML=state.teams.map(t=>`<button class="team-card team-link" type="button" data-constructor-id="${esc(t.Constructor.constructorId)}" style="border-left:4px solid ${teamColor(t.Constructor.name)}"><span class="team-rank">P${esc(t.position)} · ${esc(t.Constructor.nationality)}</span><h3>${esc(t.Constructor.name)}</h3><div class="team-meta"><div><b>${esc(t.points)}</b><small>POINTS</small></div><div><b>${esc(t.wins)}</b><small>WINS</small></div></div><span class="profile-hint">Open team profile →</span></button>`).join('');
+  $('#teamCards').innerHTML=state.teams.map(t=>`<button class="team-card team-link" type="button" data-constructor-id="${esc(t.Constructor.constructorId)}" style="border-left:4px solid ${teamColor(t.Constructor.name)}"><span class="team-rank">P${esc(t.position)} · ${esc(t.Constructor.nationality)}</span><h3>${esc(t.Constructor.name)}</h3><div class="team-meta"><div><b>${esc(t.points)}</b><small>POINTS</small></div><div><b>${esc(t.wins)}</b><small>WINS</small></div></div><span class="profile-hint">Open team profile →</span></button>`).join('') || (state.season<1958?`<div class="error-box"><b>No Constructors' Championship.</b>The championship for constructors was introduced in 1958.</div>`:'<div class="error-box">Constructor standings are unavailable for this season.</div>');
 }
 function renderWinners(){
   $('#winnerGrid').innerHTML=state.winners.map(r=>{ const result=r.Results?.[0]; return `<article class="winner-card"><div class="winner-round"><span>Round ${esc(r.round)}</span><span>${esc(fmtRaceDate(raceDateTime(r)))}</span></div><h3>${esc(r.raceName)}</h3><p class="driver-win">${esc(result?`${result.Driver.givenName} ${result.Driver.familyName}`:'Winner unavailable')}</p><p>${esc(result?.Constructor?.name||'')} · ${esc(r.Circuit.circuitName)}</p><button class="card-detail-btn" type="button" data-race-round="${esc(r.round)}">Weekend details →</button></article>`; }).join('') || '<div class="error-box"><b>No race winners yet.</b>The season has not recorded a completed Grand Prix.</div>';
@@ -112,8 +116,62 @@ function renderLatestPodium(){
 function renderCalendar(){
   const wins=winnerMap(), now=Date.now();
   const filtered=state.races.filter(r=>{const completed=wins.has(String(r.round)) || raceDateTime(r).getTime()<now; return state.filter==='all'||(state.filter==='completed'&&completed)||(state.filter==='upcoming'&&!completed);});
-  $('#calendarGrid').innerHTML=filtered.map(r=>{const w=wins.get(String(r.round)); const result=w?.Results?.[0]; const completed=!!w || raceDateTime(r).getTime()<now; const loc=r.Circuit.Location; const sessionCount=raceSessions(r).length; return `<article class="race-card ${completed?'completed':''}"><div class="round-box"><small>ROUND</small><b>${esc(r.round)}</b></div><div><h3>${esc(r.raceName)}</h3><p>${esc(r.Circuit.circuitName)}</p><p>${esc(loc.locality)}, ${esc(loc.country)}</p>${result?`<p class="winner-tag">Winner · ${esc(result.Driver.givenName)} ${esc(result.Driver.familyName)}</p>`:''}<p class="session-count">${sessionCount} scheduled sessions</p><button class="card-detail-btn" type="button" data-race-round="${esc(r.round)}">Weekend details →</button></div><div class="race-date"><strong>${esc(fmtRaceDate(raceDateTime(r)))}</strong><p>${completed?'Completed':'Upcoming'}</p></div></article>`;}).join('') || '<div class="error-box">No races match this filter.</div>';
+  $('#calendarGrid').innerHTML=filtered.map(r=>{const w=wins.get(String(r.round)); const result=w?.Results?.[0]; const completed=!!w || raceDateTime(r).getTime()<now; const loc=r.Circuit.Location; const sessionCount=raceSessions(r).length; return `<article class="race-card ${completed?'completed':''}"><div class="round-box"><small>ROUND</small><b>${esc(r.round)}</b></div><div><h3>${esc(r.raceName)}</h3><p>${esc(r.Circuit.circuitName)}</p><p>${esc(loc.locality)}, ${esc(loc.country)}</p>${result?`<p class="winner-tag">Winner · ${esc(result.Driver.givenName)} ${esc(result.Driver.familyName)}</p>`:''}<p class="session-count">${sessionCount} scheduled sessions</p><div class="card-action-row"><button class="card-detail-btn" type="button" data-race-round="${esc(r.round)}">Weekend details →</button><button class="card-detail-btn circuit-detail" type="button" data-circuit-id="${esc(r.Circuit.circuitId)}">Circuit intel →</button></div></div><div class="race-date"><strong>${esc(fmtRaceDate(raceDateTime(r)))}</strong><p>${completed?'Completed':'Upcoming'}</p></div></article>`;}).join('') || '<div class="error-box">No races match this filter.</div>';
 }
+
+function parseLapSeconds(value=''){
+  const parts=String(value).split(':').map(Number);
+  if(parts.some(Number.isNaN)) return NaN;
+  return parts.length===2 ? parts[0]*60+parts[1] : parts[0];
+}
+function estimateCircuitLengthKm(result){
+  const lap=result?.FastestLap, speed=Number(lap?.AverageSpeed?.speed), seconds=parseLapSeconds(lap?.Time?.time);
+  if(!Number.isFinite(speed)||!Number.isFinite(seconds)||seconds<=0) return null;
+  const km=speed*seconds/3600;
+  return km>1&&km<15?km:null;
+}
+function seasonRaceForCircuit(circuitId){ return state.races.find(r=>r.Circuit?.circuitId===circuitId); }
+function seasonResultForCircuit(circuitId){ return state.analytics.results.find(r=>r.Circuit?.circuitId===circuitId); }
+function renderCircuits(){
+  const host=$('#circuitGrid'); if(!host) return;
+  const seen=new Set(); const races=state.races.filter(r=>{const id=r.Circuit?.circuitId;if(!id||seen.has(id))return false;seen.add(id);return true;});
+  host.innerHTML=races.map(r=>{
+    const loc=r.Circuit.Location, resultRace=seasonResultForCircuit(r.Circuit.circuitId), winner=resultRace?.Results?.find(x=>String(x.position)==='1'), fastest=resultRace?.Results?.find(x=>String(x.FastestLap?.rank)==='1');
+    const length=estimateCircuitLengthKm(fastest);
+    return `<article class="circuit-card"><div class="circuit-card-top"><span>ROUND ${esc(r.round)}</span><span>${esc(loc.country)}</span></div><h3>${esc(r.Circuit.circuitName)}</h3><p>${esc(loc.locality)}, ${esc(loc.country)}</p><div class="circuit-mini-stats"><div><small>EST. LENGTH</small><strong>${length?`${length.toFixed(3)} km`:'On demand'}</strong></div><div><small>${winner?'SEASON WINNER':'RACE DATE'}</small><strong>${winner?esc(`${winner.Driver.givenName} ${winner.Driver.familyName}`):esc(fmtRaceDate(raceDateTime(r)))}</strong></div></div><button class="weekend-btn" type="button" data-circuit-id="${esc(r.Circuit.circuitId)}">Open Circuit Intel →</button></article>`;
+  }).join('') || '<div class="error-box">No circuit data is available for this season.</div>';
+}
+function fastestRecordedLap(races){
+  let best=null;
+  races.forEach(r=>(r.Results||[]).forEach(x=>{const t=x.FastestLap?.Time?.time,sec=parseLapSeconds(t);if(Number.isFinite(sec)&&(!best||sec<best.seconds))best={seconds:sec,time:t,driver:x.Driver,race:r,lap:x.FastestLap};}));
+  return best;
+}
+async function getCircuitIntel(circuitId){
+  const key=`circuit-${circuitId}`; if(state.circuitCache.has(key)) return state.circuitCache.get(key);
+  const id=encodeURIComponent(circuitId);
+  const [racesRes,fastRes,winsRes]=await Promise.allSettled([
+    getJson(`circuits/${id}/races.json?limit=100`),
+    getJson(`circuits/${id}/fastest/1/results.json?limit=100`),
+    getJson(`circuits/${id}/results/1.json?limit=100`)
+  ]);
+  const data={races:racesRes.status==='fulfilled'?parseRaces(racesRes.value):[],fastest:fastRes.status==='fulfilled'?parseRaces(fastRes.value):[],wins:winsRes.status==='fulfilled'?parseRaces(winsRes.value):[]};
+  state.circuitCache.set(key,data); return data;
+}
+function openCircuitShell(){ const modal=$('#circuitModal');modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.classList.add('modal-open'); }
+async function openCircuitIntel(circuitId){
+  const race=seasonRaceForCircuit(circuitId)||state.races.find(r=>r.Circuit?.circuitId===circuitId); if(!race) return;
+  const c=race.Circuit,loc=c.Location,content=$('#circuitModalContent'); openCircuitShell();
+  content.innerHTML=`<div class="profile-loading"><p class="eyebrow">CIRCUIT INTELLIGENCE</p><h2 id="circuitModalTitle">${esc(c.circuitName)}</h2><p>${esc(loc.locality)}, ${esc(loc.country)}</p><div class="skeleton tall"></div></div>`;
+  try{
+    const data=await getCircuitIntel(circuitId), history=[...data.races].sort((a,b)=>new Date(a.date)-new Date(b.date)), latestFast=[...data.fastest].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    const latestFastResult=latestFast?.Results?.find(x=>String(x.FastestLap?.rank)==='1')||latestFast?.Results?.[0], length=estimateCircuitLengthKm(latestFastResult);
+    const latestWinner=[...data.wins].sort((a,b)=>new Date(b.date)-new Date(a.date))[0], winner=latestWinner?.Results?.[0];
+    const record=fastestRecordedLap(data.fastest), latestLaps=winner?Number(winner.laps):null, raceDistance=length&&latestLaps?length*latestLaps:null;
+    const maps=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${loc.lat},${loc.long}`)}`;
+    content.innerHTML=`<div class="circuit-hero"><div><p class="eyebrow">TRACK INTELLIGENCE · ${esc(loc.country)}</p><h2 id="circuitModalTitle">${esc(c.circuitName)}</h2><p>${esc(loc.locality)}, ${esc(loc.country)} · ${esc(loc.lat)}, ${esc(loc.long)}</p></div><span class="circuit-round-chip">${esc(state.season)} · ROUND ${esc(race.round)}</span></div>${profileStats([['EST. LENGTH',length?`${length.toFixed(3)} km`:'—','derived'],['LATEST DIST.',raceDistance?`${raceDistance.toFixed(1)} km`:'—','derived'],['F1 GRANDS PRIX',history.length,'recorded'],['FIRST GP',history[0]?.season||'—','at this circuit'],['FASTEST LAP',record?.time||'—','recorded race lap'],['LATEST WINNER',winner?`${winner.Driver.familyName}`:'—',latestWinner?.season||'']])}<div class="profile-columns"><section class="profile-panel"><div class="modal-section-head"><p class="eyebrow">CIRCUIT HISTORY</p><h3>Formula 1 record</h3></div><dl class="profile-details"><div><dt>First recorded Grand Prix</dt><dd>${esc(history[0]?`${history[0].season} ${history[0].raceName}`:'—')}</dd></div><div><dt>Most recent Grand Prix</dt><dd>${esc(history.at(-1)?`${history.at(-1).season} ${history.at(-1).raceName}`:'—')}</dd></div><div><dt>Recorded F1 races</dt><dd>${esc(history.length)}</dd></div><div><dt>Fastest recorded race lap</dt><dd>${esc(record?`${record.time} · ${record.driver.givenName} ${record.driver.familyName} (${record.race.season})`:'—')}</dd></div><div><dt>Latest winner</dt><dd>${esc(winner?`${winner.Driver.givenName} ${winner.Driver.familyName} (${latestWinner.season})`:'—')}</dd></div></dl></section><section class="profile-panel"><div class="modal-section-head"><p class="eyebrow">VENUE DATA</p><h3>Track & location</h3></div><dl class="profile-details"><div><dt>Estimated track length</dt><dd>${length?`${length.toFixed(3)} km`:'—'}</dd></div><div><dt>Latest race laps</dt><dd>${latestLaps||'—'}</dd></div><div><dt>Estimated race distance</dt><dd>${raceDistance?`${raceDistance.toFixed(1)} km`:'—'}</dd></div><div><dt>Latitude / longitude</dt><dd>${esc(`${loc.lat}, ${loc.long}`)}</dd></div></dl><p class="intel-note">Length and distance are derived from the latest recorded fastest-lap average speed/time and race lap count. They are estimates, not official FIA circuit specifications.</p><a class="profile-source-link" href="${maps}" target="_blank" rel="noopener">Open venue map ↗</a>${c.url?`<a class="profile-source-link circuit-ref" href="${esc(c.url)}" target="_blank" rel="noopener">Circuit reference ↗</a>`:''}</section></div>`;
+  }catch(err){content.innerHTML='<div class="error-box"><b>Circuit intelligence unavailable.</b>The season calendar remains available.</div>';}
+}
+function closeCircuit(){ const modal=$('#circuitModal');modal.classList.remove('open');modal.setAttribute('aria-hidden','true');if(!$('#raceModal').classList.contains('open')&&!$('#profileModal').classList.contains('open'))document.body.classList.remove('modal-open'); }
 
 function countBy(items, keyFn, predicate=()=>true){
   const map=new Map();
@@ -169,7 +227,7 @@ function trendColor(i){ return ['#63b8ff','#ff8700','#b47cff','#40d9a4','#f2d16b
 function renderTrendChart(){
   const host=$('#trendChart'), legend=$('#trendLegend'); if(!host||!legend) return;
   const {rounds,series}=pointsByRound(state.trendType);
-  if(!rounds.length){ host.innerHTML='<p class="no-results">Championship progression will appear after points are scored.</p>'; legend.innerHTML=''; return; }
+  if(!rounds.length||!series.length){ host.innerHTML=`<p class="no-results">${state.trendType==='constructors'&&state.season<1958?'The Constructors\' Championship began in 1958.':'Championship progression will appear after points are scored.'}</p>`; legend.innerHTML=''; return; }
   const width=Math.max(820,rounds.length*72), height=390, pad={l:58,r:28,t:24,b:54};
   const max=Math.max(1,...series.flatMap(s=>s.values));
   const x=i=>pad.l+(i/(Math.max(1,rounds.length-1)))*(width-pad.l-pad.r);
@@ -203,36 +261,50 @@ function renderAnalytics(){
 }
 
 function renderSeasonLabels(){
-  $('#seasonLabel').textContent=`${state.season} SEASON`; ['driver','team','trend','winner','calendar'].forEach(x=>$(`#${x}SeasonChip`).textContent=state.season);
+  $('#seasonLabel').textContent=`${state.season} SEASON`; ['driver','team','trend','winner','calendar','circuit'].forEach(x=>$(`#${x}SeasonChip`).textContent=state.season);
 }
-function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderAnalytics();renderWinners();renderLatestPodium();renderCalendar(); }
+function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderAnalytics();renderWinners();renderLatestPodium();renderCalendar();renderCircuits(); }
 function showError(err){
   setStatus('error','Offline'); toast('Unable to refresh live F1 data');
   const msg=`<div class="error-box"><b>Live data is temporarily unavailable.</b>${esc(err.message)}. Check your connection or try Refresh Data.</div>`;
-  ['#homeDrivers','#homeTeams','#driverTable','#teamCards','#seasonLeaderCards','#trendChart','#poleLeaders','#fastestLapLeaders','#podiumLeaders','#formLeaders','#winnerGrid','#calendarGrid','#latestPodium'].forEach(s=>$(s).innerHTML=msg);
+  ['#homeDrivers','#homeTeams','#driverTable','#teamCards','#seasonLeaderCards','#trendChart','#poleLeaders','#fastestLapLeaders','#podiumLeaders','#formLeaders','#winnerGrid','#calendarGrid','#circuitGrid','#latestPodium'].forEach(s=>$(s).innerHTML=msg);
 }
 async function loadData(manual=false){
-  setStatus('','Syncing'); if(manual) toast('Refreshing championship data…');
+  setStatus('','Syncing'); if(manual) toast(`Refreshing ${state.season} F1 data…`);
   try{
-    const [drivers,teams,schedule]=await Promise.all([
-      getJson('current/driverstandings.json'), getJson('current/constructorstandings.json'), getJson('current.json?limit=100')
+    const season=state.season;
+    const [driversRes,teamsRes,scheduleRes]=await Promise.allSettled([
+      getJson(`${season}/driverstandings.json`), getJson(`${season}/constructorstandings.json`), getJson(`${season}.json?limit=100`)
     ]);
-    state.drivers=parseStandings(drivers,'DriverStandings'); state.teams=parseStandings(teams,'ConstructorStandings'); state.races=parseRaces(schedule);
+    if(driversRes.status!=='fulfilled'||scheduleRes.status!=='fulfilled') throw new Error(`Core ${season} season data is unavailable`);
+    state.drivers=parseStandings(driversRes.value,'DriverStandings');
+    state.teams=teamsRes.status==='fulfilled'?parseStandings(teamsRes.value,'ConstructorStandings'):[];
+    state.races=parseRaces(scheduleRes.value);
     await sleep(350);
-    state.analytics.results=await getPagedRaces('current/results.json','Results');
-    try{ await sleep(350); state.analytics.qualifying=await getPagedRaces('current/qualifying.json','QualifyingResults'); }catch(err){ console.warn('Qualifying analytics unavailable',err); state.analytics.qualifying=[]; }
-    try{ await sleep(350); state.analytics.sprints=await getPagedRaces('current/sprint.json','SprintResults'); }catch(err){ console.warn('Sprint analytics unavailable',err); state.analytics.sprints=[]; }
+    state.analytics.results=await getPagedRaces(`${season}/results.json`,'Results');
+    try{ await sleep(350); state.analytics.qualifying=await getPagedRaces(`${season}/qualifying.json`,'QualifyingResults'); }catch(err){ console.warn('Qualifying analytics unavailable',err); state.analytics.qualifying=[]; }
+    try{ await sleep(350); state.analytics.sprints=await getPagedRaces(`${season}/sprint.json`,'SprintResults'); }catch(err){ console.warn('Sprint analytics unavailable',err); state.analytics.sprints=[]; }
     state.winners=state.analytics.results;
-    renderAll(); setStatus('online','Live'); $('#lastUpdated').textContent=`Updated ${new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date())}`; if(manual) toast('F1 data refreshed');
+    renderAll(); setStatus('online',season===CURRENT_YEAR?'Live':'Archive'); $('#lastUpdated').textContent=`${season} data loaded · ${new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date())}`; if(manual) toast(`${season} F1 data refreshed`);
   }catch(err){ console.error(err); showError(err); }
 }
 function switchView(name){
-  $$('.view').forEach(v=>v.classList.toggle('active',v.dataset.viewPanel===name)); $$('.nav-link').forEach(n=>n.classList.toggle('active',n.dataset.view===name)); window.scrollTo({top:0,behavior:'smooth'});
+  $$('.view').forEach(v=>v.classList.toggle('active',v.dataset.viewPanel===name)); function initSeasonSelector(){
+  const select=$('#seasonSelect'); if(!select) return;
+  select.innerHTML=Array.from({length:CURRENT_YEAR-1949},(_,i)=>CURRENT_YEAR-i).map(y=>`<option value="${y}" ${y===state.season?'selected':''}>${y}${y===CURRENT_YEAR?' · Current':''}</option>`).join('');
+  select.addEventListener('change',()=>{
+    state.season=Number(select.value); state.filter='all'; state.weekendCache.clear(); state.profileCache.clear();
+    $$('.filter-btn').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));
+    loadData(false); switchView('home');
+  });
+}
+initSeasonSelector();
+$$('.nav-link').forEach(n=>n.classList.toggle('active',n.dataset.view===name)); window.scrollTo({top:0,behavior:'smooth'});
 }
 
 function calcAge(dob){
   if(!dob) return '—';
-  const born=new Date(`${dob}T00:00:00`), now=new Date();
+  const born=new Date(`${dob}T00:00:00`), now=state.season===CURRENT_YEAR?new Date():new Date(`${state.season}-12-31T00:00:00`);
   let age=now.getFullYear()-born.getFullYear();
   if(now < new Date(now.getFullYear(),born.getMonth(),born.getDate())) age--;
   return age;
@@ -304,7 +376,7 @@ async function openConstructorProfile(constructorId){
 }
 function closeProfile(){
   const modal=$('#profileModal'); modal.classList.remove('open'); modal.setAttribute('aria-hidden','true');
-  if(!$('#raceModal').classList.contains('open')) document.body.classList.remove('modal-open');
+  if(!$('#raceModal').classList.contains('open')&&!$('#circuitModal').classList.contains('open')) document.body.classList.remove('modal-open');
 }
 
 function resultRows(items, mode='race'){
@@ -356,18 +428,32 @@ async function openRaceWeekend(round){
   }
 }
 function closeRaceWeekend(){
-  const modal=$('#raceModal'); modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); if(!$('#profileModal').classList.contains('open')) document.body.classList.remove('modal-open');
+  const modal=$('#raceModal'); modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); if(!$('#profileModal').classList.contains('open')&&!$('#circuitModal').classList.contains('open')) document.body.classList.remove('modal-open');
 }
 
+function initSeasonSelector(){
+  const select=$('#seasonSelect'); if(!select) return;
+  select.innerHTML=Array.from({length:CURRENT_YEAR-1949},(_,i)=>CURRENT_YEAR-i).map(y=>`<option value="${y}" ${y===state.season?'selected':''}>${y}${y===CURRENT_YEAR?' · Current':''}</option>`).join('');
+  select.addEventListener('change',()=>{
+    state.season=Number(select.value); state.filter='all'; state.weekendCache.clear(); state.profileCache.clear();
+    $$('.filter-btn').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));
+    loadData(false); switchView('home');
+  });
+}
+initSeasonSelector();
 $$('.nav-link').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-$$('[data-jump]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.jump)));
 $$('.filter-btn').forEach(b=>b.addEventListener('click',()=>{state.filter=b.dataset.filter; $$('.filter-btn').forEach(x=>x.classList.toggle('active',x===b)); renderCalendar();}));
 $('#refreshBtn').addEventListener('click',()=>loadData(true));
 document.addEventListener('click',(e)=>{
+  const jump=e.target.closest('[data-jump]'); if(jump){ switchView(jump.dataset.jump); return; }
+  const closeCircuitBtn=e.target.closest('[data-close-circuit-modal]'); if(closeCircuitBtn){ closeCircuit(); return; }
   const closeRace=e.target.closest('[data-close-race-modal]');
   if(closeRace){ closeRaceWeekend(); return; }
   const closeProfileBtn=e.target.closest('[data-close-profile-modal]');
   if(closeProfileBtn){ closeProfile(); return; }
+
+  const circuitBtn=e.target.closest('[data-circuit-id]');
+  if(circuitBtn){ e.preventDefault(); openCircuitIntel(circuitBtn.dataset.circuitId); return; }
 
   const driverBtn=e.target.closest('[data-driver-id]');
   if(driverBtn){ e.preventDefault(); openDriverProfile(driverBtn.dataset.driverId); return; }
@@ -384,6 +470,6 @@ document.addEventListener('click',(e)=>{
   const tab=e.target.closest('[data-result-tab]');
   if(tab){ const root=tab.closest('section'); root.querySelectorAll('.result-tab').forEach(x=>x.classList.toggle('active',x===tab)); root.querySelectorAll('.result-panel').forEach(x=>x.classList.toggle('active',x.dataset.resultPanel===tab.dataset.resultTab)); }
 });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ closeRaceWeekend(); closeProfile(); } });
-setInterval(renderNextRace,1000); setInterval(()=>loadData(false),5*60*1000);
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ closeRaceWeekend(); closeProfile(); closeCircuit(); } });
+setInterval(renderNextRace,1000); setInterval(()=>{if(state.season===CURRENT_YEAR)loadData(false);},5*60*1000);
 loadData();

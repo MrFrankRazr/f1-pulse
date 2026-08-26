@@ -7,7 +7,7 @@
   <meta name="description" content="F1 Pulse — current Formula 1 standings, results, winners, schedules and circuit information." />
   <title>F1 Pulse | Formula Racing Dashboard</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=1.3.0" />
+  <link rel="stylesheet" href="styles.css?v=1.4.0" />
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -23,10 +23,14 @@
       <button class="nav-link" data-view="trends">Trends</button>
       <button class="nav-link" data-view="winners">Winners</button>
       <button class="nav-link" data-view="calendar">Calendar</button>
+      <button class="nav-link" data-view="circuits">Circuits</button>
     </nav>
-    <div class="live-status" title="Data refresh status">
+    <div class="header-controls">
+      <label class="season-control" for="seasonSelect"><span>Season</span><select id="seasonSelect" aria-label="Select Formula 1 season"></select></label>
+      <div class="live-status" title="Data refresh status">
       <span class="status-dot" id="statusDot"></span>
-      <span id="statusText">Connecting</span>
+        <span id="statusText">Connecting</span>
+      </div>
     </div>
   </header>
 
@@ -115,6 +119,12 @@
       <div class="calendar-tools"><button class="filter-btn active" data-filter="all">All</button><button class="filter-btn" data-filter="upcoming">Upcoming</button><button class="filter-btn" data-filter="completed">Completed</button></div>
       <div id="calendarGrid" class="calendar-grid"><div class="skeleton tall"></div></div>
     </section>
+    <section class="view content-view" id="view-circuits" data-view-panel="circuits">
+      <div class="page-title"><div><p class="eyebrow">TRACK INTELLIGENCE</p><h1>Circuits</h1></div><span class="season-chip" id="circuitSeasonChip"></span></div>
+      <div class="circuit-intro"><p>Explore every venue on the selected season calendar. Open Circuit Intel for historical Grand Prix count, first appearance, fastest recorded race lap, and derived track/race distance where data is available.</p></div>
+      <div id="circuitGrid" class="circuit-grid"><div class="skeleton tall"></div></div>
+    </section>
+
   </main>
 
   <footer>
@@ -139,7 +149,16 @@
     </section>
   </div>
 
+
+  <div class="circuit-modal" id="circuitModal" aria-hidden="true">
+    <div class="circuit-modal-backdrop" data-close-circuit-modal></div>
+    <section class="circuit-modal-panel" role="dialog" aria-modal="true" aria-labelledby="circuitModalTitle">
+      <button class="modal-close" type="button" aria-label="Close circuit intelligence" data-close-circuit-modal>×</button>
+      <div id="circuitModalContent"><div class="skeleton tall"></div></div>
+    </section>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=1.3.0" defer></script>
+  <script src="app.js?v=1.4.0" defer></script>
 </body>
 </html>
