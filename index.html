@@ -7,7 +7,7 @@
   <meta name="description" content="F1 Pulse — current Formula 1 standings, results, winners, schedules and circuit information." />
   <title>F1 Pulse | Formula Racing Dashboard</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=1.8.2" />
+  <link rel="stylesheet" href="styles.css?v=1.9.0" />
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -19,8 +19,10 @@
     <nav class="nav" aria-label="Primary navigation">
       <button class="nav-link active" data-view="home">Race Control</button>
       <button class="nav-link" data-view="live">Live Center</button>
+      <button class="nav-link" data-view="news">News</button>
       <button class="nav-link" data-view="drivers">Drivers</button>
       <button class="nav-link" data-view="teams">Constructors</button>
+      <button class="nav-link" data-view="form">Form</button>
       <button class="nav-link" data-view="trends">Trends</button>
       <button class="nav-link" data-view="compare">Compare</button>
       <button class="nav-link" data-view="scenario">Scenario</button>
@@ -91,6 +93,26 @@
       <p class="live-data-note">F1 Pulse shows the latest classifications published by Jolpica. It does not claim to provide official real-time lap timing or telemetry.</p>
     </section>
 
+    <section class="view content-view" id="view-news" data-view-panel="news">
+      <div class="page-title"><div><p class="eyebrow">PADDOCK WIRE</p><h1>F1 News & Headlines</h1><p class="page-subtitle">Fresh Formula 1 headlines with direct links to the original publisher. News stays current regardless of the historical season selector.</p></div><span class="season-chip">LIVE NEWS</span></div>
+      <section class="news-source-bar">
+        <div><strong>Latest paddock coverage</strong><span id="newsUpdated">Loading headlines…</span></div>
+        <div class="news-source-links"><a href="https://www.formula1.com/en/latest" target="_blank" rel="noopener">Formula1.com ↗</a><a href="https://www.fia.com/media-center/press_release/name/F1" target="_blank" rel="noopener">FIA F1 releases ↗</a><button class="ghost-btn small" id="newsRefresh" type="button">Refresh news</button></div>
+      </section>
+      <div id="newsGrid" class="news-grid"><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
+      <p class="intel-note">Headline feed is loaded independently from championship data. If the news provider is unavailable, the rest of F1 Pulse remains fully functional.</p>
+    </section>
+
+    <section class="view content-view" id="view-form" data-view-panel="form">
+      <div class="page-title"><div><p class="eyebrow">MOMENTUM WATCH</p><h1>Form, Streaks & Milestones</h1><p class="page-subtitle">See who is hot, which teams are gaining momentum, and the season milestones reached round by round.</p></div><span class="season-chip" id="formSeasonChip"></span></div>
+      <div id="formHero" class="form-hero-grid"><div class="skeleton tall"></div></div>
+      <div class="form-layout">
+        <section class="analytics-panel form-driver-panel"><div class="analytics-panel-head"><div><p class="eyebrow">LAST FIVE ROUNDS</p><h2>Driver form guide</h2><p>Recent Grand Prix finishing positions with race + sprint points across the last five completed rounds.</p></div></div><div id="driverFormGuide"><div class="skeleton tall"></div></div></section>
+        <section class="analytics-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">CONSTRUCTOR MOMENTUM</p><h2>Team form</h2></div></div><div id="teamFormLeaders" class="leaderboard-list"><div class="skeleton tall"></div></div></section>
+      </div>
+      <section class="analytics-panel milestone-feed-panel"><div class="analytics-panel-head"><div><p class="eyebrow">SEASON MARKERS</p><h2>Recent milestones</h2><p>Notable firsts and threshold achievements detected from the selected season results.</p></div></div><div id="formMilestones" class="form-milestone-feed"><div class="skeleton tall"></div></div></section>
+    </section>
+
     <section class="view content-view" id="view-drivers" data-view-panel="drivers">
       <div class="page-title"><div><p class="eyebrow">WORLD CHAMPIONSHIP</p><h1>Driver Standings</h1></div><span class="season-chip" id="driverSeasonChip"></span></div>
       <div class="table-shell"><div id="driverTable" class="data-table"><div class="skeleton tall"></div></div></div>
@@ -134,9 +156,12 @@
       <div class="page-title"><div><p class="eyebrow">HEAD-TO-HEAD</p><h1>Compare the Grid</h1><p class="page-subtitle">Put two drivers or constructors side by side across the selected season.</p></div><span class="season-chip" id="compareSeasonChip"></span></div>
       <section class="analytics-panel compare-control-panel">
         <div class="compare-toolbar">
-          <div class="trend-toggle" role="group" aria-label="Comparison type">
+          <div class="compare-toolbar-actions">
+            <div class="trend-toggle" role="group" aria-label="Comparison type">
             <button class="analytics-toggle active" type="button" data-compare-type="drivers">Drivers</button>
             <button class="analytics-toggle" type="button" data-compare-type="constructors">Constructors</button>
+            </div>
+            <button class="share-btn" type="button" data-share-compare>Share comparison card</button>
           </div>
           <div class="compare-selectors">
             <label><span>Competitor A</span><select id="compareSelectA" aria-label="Select first competitor"></select></label>
@@ -264,6 +289,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=1.8.2" defer></script>
+  <script src="app.js?v=1.9.0" defer></script>
 </body>
 </html>

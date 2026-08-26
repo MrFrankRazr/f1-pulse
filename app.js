@@ -1,6 +1,6 @@
 const API = 'https://api.jolpi.ca/ergast/f1';
 const CURRENT_YEAR = new Date().getFullYear();
-const state = { drivers: [], teams: [], races: [], winners: [], season: CURRENT_YEAR, filter: 'all', trendType: 'drivers', compareType: 'drivers', compareA: null, compareB: null, scenario: {a:null,b:null,raceA:1,raceB:2,sprintA:1,sprintB:2}, analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map(), circuitCache: new Map(), liveCenter: { weatherCache: new Map(), lastRound: null } };
+const state = { drivers: [], teams: [], races: [], winners: [], season: CURRENT_YEAR, filter: 'all', trendType: 'drivers', compareType: 'drivers', compareA: null, compareB: null, scenario: {a:null,b:null,raceA:1,raceB:2,sprintA:1,sprintB:2}, analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map(), circuitCache: new Map(), liveCenter: { weatherCache: new Map(), lastRound: null }, news: {loaded:false,loading:false,articles:[],updatedAt:null} };
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
@@ -418,13 +418,13 @@ function renderScenario(){
 }
 
 function renderSeasonLabels(){
-  $('#seasonLabel').textContent=`${state.season} SEASON`; ['live','driver','team','trend','compare','scenario','myf1','records','predictor','winner','calendar','circuit'].forEach(x=>{ const el=$(`#${x}SeasonChip`); if(el) el.textContent=state.season; });
+  $('#seasonLabel').textContent=`${state.season} SEASON`; ['live','driver','team','form','trend','compare','scenario','myf1','records','predictor','winner','calendar','circuit'].forEach(x=>{ const el=$(`#${x}SeasonChip`); if(el) el.textContent=state.season; });
 }
-function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderAnalytics();renderCompare();renderScenario();renderMyF1();renderSeasonMilestones();renderPredictor();renderWinners();renderLatestPodium();renderCalendar();renderCircuits(); if($('#view-live')?.classList.contains('active')) renderLiveCenter(false); if($('#view-records')?.classList.contains('active')&&state.records.loaded) renderRecords(); }
+function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderFormCenter();renderAnalytics();renderCompare();renderScenario();renderMyF1();renderSeasonMilestones();renderPredictor();renderWinners();renderLatestPodium();renderCalendar();renderCircuits(); if($('#view-live')?.classList.contains('active')) renderLiveCenter(false); if($('#view-records')?.classList.contains('active')&&state.records.loaded) renderRecords(); }
 function showError(err){
   setStatus('error','Offline'); toast('Unable to refresh live F1 data');
   const msg=`<div class="error-box"><b>Live data is temporarily unavailable.</b>${esc(err.message)}. Check your connection or try Refresh Data.</div>`;
-  ['#homeDrivers','#homeTeams','#driverTable','#teamCards','#seasonLeaderCards','#trendChart','#poleLeaders','#fastestLapLeaders','#podiumLeaders','#formLeaders','#compareHero','#compareStats','#compareRounds','#scenarioResults','#myF1Dashboard','#winnerGrid','#calendarGrid','#circuitGrid','#latestPodium'].forEach(s=>$(s).innerHTML=msg);
+  ['#homeDrivers','#homeTeams','#driverTable','#teamCards','#seasonLeaderCards','#trendChart','#poleLeaders','#fastestLapLeaders','#podiumLeaders','#formLeaders','#compareHero','#compareStats','#compareRounds','#scenarioResults','#myF1Dashboard','#formHero','#driverFormGuide','#teamFormLeaders','#formMilestones','#winnerGrid','#calendarGrid','#circuitGrid','#latestPodium'].forEach(s=>$(s).innerHTML=msg);
 }
 async function loadData(manual=false){
   setStatus('','Syncing'); if(manual) toast(`Refreshing ${state.season} F1 data…`);
@@ -449,6 +449,8 @@ function switchView(name){
   $$('.view').forEach(v=>v.classList.toggle('active',v.dataset.viewPanel===name));
   $$('.nav-link').forEach(n=>n.classList.toggle('active',n.dataset.view===name));
   if(name==='live') renderLiveCenter(false);
+  if(name==='news') loadNews(false);
+  if(name==='form') renderFormCenter();
   if(name==='records') loadRecords(false);
   if(name==='predictor') renderPredictor();
   window.scrollTo({top:0,behavior:'smooth'});
@@ -711,6 +713,7 @@ $$('.nav-link').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.v
 $$('.filter-btn').forEach(b=>b.addEventListener('click',()=>{state.filter=b.dataset.filter; $$('.filter-btn').forEach(x=>x.classList.toggle('active',x===b)); renderCalendar();}));
 $('#refreshBtn').addEventListener('click',()=>loadData(true));
 const liveRefresh=$('#liveCenterRefresh'); if(liveRefresh) liveRefresh.addEventListener('click',()=>{toast('Refreshing race weekend center…');renderLiveCenter(true);});
+const newsRefresh=$('#newsRefresh'); if(newsRefresh) newsRefresh.addEventListener('click',()=>loadNews(true));
 const compareA=$('#compareSelectA'), compareB=$('#compareSelectB');
 if(compareA) compareA.addEventListener('change',()=>{ state.compareA=compareA.value; if(state.compareA===state.compareB){const alt=compareOptions().find(x=>x.id!==state.compareA); if(alt) state.compareB=alt.id;} renderCompare(); });
 if(compareB) compareB.addEventListener('change',()=>{ state.compareB=compareB.value; if(state.compareB===state.compareA){const alt=[...compareOptions()].reverse().find(x=>x.id!==state.compareB); if(alt) state.compareA=alt.id;} renderCompare(); });
@@ -735,6 +738,8 @@ document.addEventListener('click',(e)=>{
   const removeFav=e.target.closest('[data-remove-favorite]'); if(removeFav){ removeFavorite(removeFav.dataset.removeFavorite,removeFav.dataset.favoriteId); return; }
   const savePickBtn=e.target.closest('[data-save-pick]'); if(savePickBtn){ saveCurrentPick(); return; }
   const clearPickBtn=e.target.closest('[data-clear-pick]'); if(clearPickBtn){ clearCurrentPick(); return; }
+  const shareCompareBtn=e.target.closest('[data-share-compare]'); if(shareCompareBtn){ shareComparisonCard(); return; }
+  const sharePickBtn=e.target.closest('[data-share-pick]'); if(sharePickBtn){ sharePredictionCard(sharePickBtn.dataset.sharePick); return; }
   const closeCircuitBtn=e.target.closest('[data-close-circuit-modal]'); if(closeCircuitBtn){ closeCircuit(); return; }
   const closeRace=e.target.closest('[data-close-race-modal]');
   if(closeRace){ closeRaceWeekend(); return; }
@@ -874,11 +879,11 @@ function renderPredictor(){
   else{
     const saved=currentPick(race);const defaults=saved?.podium||[state.drivers[0]?.Driver?.driverId,state.drivers[1]?.Driver?.driverId,state.drivers[2]?.Driver?.driverId];state.predictor={p1:defaults[0],p2:defaults[1],p3:defaults[2]};const locked=raceDateTime(race).getTime()<=Date.now();
     head.innerHTML=`<div><p class="eyebrow">ROUND ${esc(race.round)} · ${esc(race.Circuit.Location.country)}</p><h2>${esc(race.raceName)}</h2><p>${esc(fmtSession(raceDateTime(race)))} · ${esc(race.Circuit.circuitName)}</p></div>`;
-    form.innerHTML=`<div class="podium-picks"><label class="podium-pick"><span>P1 · WINNER</span><select id="pickP1" ${locked?'disabled':''}>${driverOptionHtml(state.predictor.p1)}</select></label><label class="podium-pick"><span>P2 · RUNNER-UP</span><select id="pickP2" ${locked?'disabled':''}>${driverOptionHtml(state.predictor.p2)}</select></label><label class="podium-pick"><span>P3 · PODIUM</span><select id="pickP3" ${locked?'disabled':''}>${driverOptionHtml(state.predictor.p3)}</select></label></div><div class="predictor-actions"><button type="button" data-save-pick ${locked?'disabled':''}>${saved?'Update prediction':'Save prediction'}</button>${saved&&!locked?'<button class="secondary" type="button" data-clear-pick>Clear</button>':''}</div><p class="pick-lock-note">${locked?'Race start has passed. This pick is locked.':'Predictions can be changed until the scheduled race start. Scoring: 3 points for an exact podium position, 1 point for a podium driver in the wrong position. Maximum 9 points.'}</p>`;
+    form.innerHTML=`<div class="podium-picks"><label class="podium-pick"><span>P1 · WINNER</span><select id="pickP1" ${locked?'disabled':''}>${driverOptionHtml(state.predictor.p1)}</select></label><label class="podium-pick"><span>P2 · RUNNER-UP</span><select id="pickP2" ${locked?'disabled':''}>${driverOptionHtml(state.predictor.p2)}</select></label><label class="podium-pick"><span>P3 · PODIUM</span><select id="pickP3" ${locked?'disabled':''}>${driverOptionHtml(state.predictor.p3)}</select></label></div><div class="predictor-actions"><button type="button" data-save-pick ${locked?'disabled':''}>${saved?'Update prediction':'Save prediction'}</button>${saved&&!locked?'<button class="secondary" type="button" data-clear-pick>Clear</button>':''}${saved?'<button class="secondary" type="button" data-share-pick="'+esc(saved.key)+'">Share card</button>':''}</div><p class="pick-lock-note">${locked?'Race start has passed. This pick is locked.':'Predictions can be changed until the scheduled race start. Scoring: 3 points for an exact podium position, 1 point for a podium driver in the wrong position. Maximum 9 points.'}</p>`;
   }
   const scored=picks.map(p=>({p,score:scorePick(p)})).filter(x=>x.score);const total=scored.reduce((a,x)=>a+x.score.score,0),perfect=scored.filter(x=>x.score.score===9).length,best=scored.length?Math.max(...scored.map(x=>x.score.score)):0;
   scorecard.innerHTML=`<div class="scorecard-stats"><div class="scorecard-stat"><small>Predictions</small><strong>${picks.length}</strong></div><div class="scorecard-stat"><small>Scored races</small><strong>${scored.length}</strong></div><div class="scorecard-stat"><small>Total score</small><strong>${total}</strong></div><div class="scorecard-stat"><small>Best / 9</small><strong>${best}</strong></div></div><p class="intel-note">Perfect podiums: ${perfect}. Picks are stored only on this device.</p>`;
-  history.innerHTML=picks.length?picks.map(p=>{const s=scorePick(p);const names=p.podiumNames||p.podium.map(nameForDriverId);return `<div class="prediction-row"><div><strong>Round ${esc(p.round)} · ${esc(p.raceName||'Grand Prix')}</strong><small>${esc(p.savedAt?new Date(p.savedAt).toLocaleDateString():'Saved pick')}</small></div><div class="prediction-podium">${names.map((n,i)=>`<span>P${i+1} ${esc(n)}</span>`).join('')}</div><div class="prediction-score">${s?`<strong>${s.score} / 9</strong><small>${s.exact} exact</small>`:'<strong>Pending</strong><small>Awaiting result</small>'}</div></div>`}).join(''):'<div class="predictor-empty">No Fan Picks saved for this season yet.</div>';
+  history.innerHTML=picks.length?picks.map(p=>{const s=scorePick(p);const names=p.podiumNames||p.podium.map(nameForDriverId);return `<div class="prediction-row"><div><strong>Round ${esc(p.round)} · ${esc(p.raceName||'Grand Prix')}</strong><small>${esc(p.savedAt?new Date(p.savedAt).toLocaleDateString():'Saved pick')}</small></div><div class="prediction-podium">${names.map((n,i)=>`<span>P${i+1} ${esc(n)}</span>`).join('')}</div><div class="prediction-score">${s?`<strong>${s.score} / 9</strong><small>${s.exact} exact</small>`:'<strong>Pending</strong><small>Awaiting result</small>'}<button class="prediction-share" type="button" data-share-pick="${esc(p.key)}">Share</button></div></div>`}).join(''):'<div class="predictor-empty">No Fan Picks saved for this season yet.</div>';
 }
 function saveCurrentPick(){
   const race=predictorRace();if(!race||raceDateTime(race).getTime()<=Date.now())return toast('This prediction is locked');
@@ -886,3 +891,112 @@ function saveCurrentPick(){
   let picks=loadPicks();const key=pickKey(state.season,race.round);const entry={key,season:state.season,round:Number(race.round),raceName:race.raceName,podium,podiumNames:podium.map(nameForDriverId),savedAt:Date.now()};const idx=picks.findIndex(p=>p.key===key);if(idx>=0)picks[idx]=entry;else picks.push(entry);savePicks(picks);toast('Fan Pick saved');renderPredictor();
 }
 function clearCurrentPick(){const race=predictorRace();if(!race)return;savePicks(loadPicks().filter(p=>p.key!==pickKey(state.season,race.round)));toast('Fan Pick cleared');renderPredictor()}
+
+
+// v1.9.0 — News, Form/Streaks/Milestones, Share Cards
+const NEWS_API='https://site.api.espn.com/apis/site/v2/sports/racing/f1/news?limit=18';
+const NEWS_CACHE_KEY='f1pulse-news-v1';
+const NEWS_CACHE_MS=15*60*1000;
+function newsCacheGet(){
+  try{const x=JSON.parse(localStorage.getItem(NEWS_CACHE_KEY)||'null');return x&&Date.now()-Number(x.savedAt)<NEWS_CACHE_MS?x:null}catch(_){return null}
+}
+function newsCacheSet(articles){try{localStorage.setItem(NEWS_CACHE_KEY,JSON.stringify({savedAt:Date.now(),articles}))}catch(_){}}
+function normalizeNewsArticle(a){
+  const link=a?.links?.web?.href||a?.link||'';
+  return {headline:a?.headline||a?.title||'Formula 1 update',description:a?.description||'',published:a?.published||a?.lastModified||null,link,byline:a?.byline||'ESPN F1',type:a?.type||'News'};
+}
+function renderNews(){
+  const host=$('#newsGrid'),stamp=$('#newsUpdated');if(!host)return;
+  const items=state.news.articles||[];
+  if(stamp) stamp.textContent=state.news.updatedAt?`Updated ${new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(state.news.updatedAt)} · ESPN F1 feed`:'Headline feed';
+  if(!items.length){host.innerHTML=`<div class="news-empty"><strong>Headline feed temporarily unavailable.</strong><p>Use the Formula1.com and FIA source links above for current coverage. Championship data is unaffected.</p></div>`;return;}
+  host.innerHTML=items.slice(0,12).map((a,i)=>{const d=a.published?new Date(a.published):null;return `<article class="news-card ${i===0?'lead':''}"><div class="news-card-top"><span>${esc(a.type||'F1 NEWS')}</span><time>${d&&!Number.isNaN(d.getTime())?esc(new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(d)):'Latest'}</time></div><h2>${esc(a.headline)}</h2>${a.description?`<p>${esc(a.description.slice(0,240))}${a.description.length>240?'…':''}</p>`:''}<div class="news-card-foot"><span>${esc(a.byline||'ESPN F1')}</span>${a.link?`<a href="${esc(a.link)}" target="_blank" rel="noopener">Read story ↗</a>`:''}</div></article>`}).join('');
+}
+async function loadNews(force=false){
+  if(state.news.loading)return;
+  if(!force&&state.news.loaded){renderNews();return;}
+  const cached=!force?newsCacheGet():null;
+  if(cached){state.news.articles=(cached.articles||[]).map(normalizeNewsArticle);state.news.updatedAt=new Date(cached.savedAt);state.news.loaded=true;renderNews();return;}
+  state.news.loading=true;const host=$('#newsGrid');if(host)host.innerHTML='<div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div>';
+  try{
+    const res=await fetch(NEWS_API,{cache:'no-store'});if(!res.ok)throw new Error(`News provider returned ${res.status}`);const data=await res.json();
+    const articles=(data?.articles||[]).map(normalizeNewsArticle).filter(a=>a.headline&&a.link);
+    state.news.articles=articles;state.news.updatedAt=new Date();state.news.loaded=true;newsCacheSet(articles);renderNews();if(force)toast('F1 headlines refreshed');
+  }catch(err){console.warn('News feed unavailable',err);state.news.articles=[];state.news.updatedAt=new Date();state.news.loaded=true;renderNews();if(force)toast('News feed temporarily unavailable');}
+  finally{state.news.loading=false;}
+}
+
+function driverRaceItems(id){return allRaceItems().filter(x=>x.result.Driver?.driverId===id).sort((a,b)=>Number(a.race.round)-Number(b.race.round));}
+function driverQualiItems(id){return allQualiItems().filter(x=>x.result.Driver?.driverId===id).sort((a,b)=>Number(a.race.round)-Number(b.race.round));}
+function consecutiveTail(items,predicate){let n=0;for(let i=items.length-1;i>=0;i--){if(predicate(items[i]))n++;else break;}return n;}
+function streakLeader(kind){
+  const entries=state.drivers.map(d=>{const id=d.Driver.driverId,r=driverRaceItems(id),q=driverQualiItems(id);let value=0;
+    if(kind==='points')value=consecutiveTail(r,x=>(Number(x.result.points)||0)>0);
+    else if(kind==='podium')value=consecutiveTail(r,x=>Number(x.result.position)<=3);
+    else if(kind==='top5')value=consecutiveTail(r,x=>Number(x.result.position)<=5);
+    else value=consecutiveTail(q,x=>Number(x.result.position)<=10);
+    return{id,label:driverFullName(d),team:constructorOfDriver(d),value};}).filter(x=>x.value>0).sort((a,b)=>b.value-a.value||a.label.localeCompare(b.label));
+  return entries[0]||null;
+}
+function lastCompletedRounds(n=5){return [...new Set(state.analytics.results.map(r=>Number(r.round)))].filter(Number.isFinite).sort((a,b)=>a-b).slice(-n);}
+function pointsForDriverRounds(id,rounds){
+  return [...allRaceItems(),...allSprintItems()].filter(x=>x.result.Driver?.driverId===id&&rounds.includes(Number(x.race.round))).reduce((n,x)=>n+(Number(x.result.points)||0),0);
+}
+function recentDriverFinishes(id,rounds){return rounds.map(round=>{const race=state.analytics.results.find(r=>Number(r.round)===round),res=race?.Results?.find(x=>x.Driver?.driverId===id);return res?{round,position:res.positionText||res.position,status:res.status||'',race:race.raceName}:{round,position:'—',status:'',race:race?.raceName||`Round ${round}`};});}
+function teamMomentum(){
+  const rounds=lastCompletedRounds(5),totals=new Map();
+  [...allRaceItems(),...allSprintItems()].forEach(x=>{if(!rounds.includes(Number(x.race.round)))return;const id=x.result.Constructor?.constructorId;if(id)totals.set(id,(totals.get(id)||0)+(Number(x.result.points)||0));});
+  return sortedCounts(totals,teamLabel);
+}
+function milestoneEvents(){
+  const rounds=[...new Set([...state.analytics.results,...state.analytics.sprints,...state.analytics.qualifying].map(r=>Number(r.round)))].filter(Number.isFinite).sort((a,b)=>a-b);const events=[];
+  state.drivers.forEach(d=>{const id=d.Driver.driverId,name=driverFullName(d);let pts=0,wins=0,podiums=0,poles=0;const crossed=new Set();
+    rounds.forEach(round=>{const race=state.analytics.results.find(r=>Number(r.round)===round),rr=race?.Results?.find(x=>x.Driver?.driverId===id);const sprint=state.analytics.sprints.find(r=>Number(r.round)===round),sr=sprint?.SprintResults?.find(x=>x.Driver?.driverId===id);const qual=state.analytics.qualifying.find(r=>Number(r.round)===round),qr=qual?.QualifyingResults?.find(x=>x.Driver?.driverId===id);
+      pts+=(Number(rr?.points)||0)+(Number(sr?.points)||0);if(Number(rr?.position)===1)wins++;if(Number(rr?.position)<=3&&Number(rr?.position)>0)podiums++;if(Number(qr?.position)===1)poles++;
+      if(wins===1&&!crossed.has('first-win')){events.push({round,name,text:'claimed a first win of the season',type:'WIN'});crossed.add('first-win');}
+      if(podiums===1&&!crossed.has('first-podium')){events.push({round,name,text:'earned a first podium of the season',type:'PODIUM'});crossed.add('first-podium');}
+      for(const t of [50,100,150,200,250,300,400,500])if(pts>=t&&!crossed.has(`pts-${t}`)){events.push({round,name,text:`crossed ${t} season points`,type:'POINTS'});crossed.add(`pts-${t}`);}
+      for(const t of [5,10])if(wins>=t&&!crossed.has(`wins-${t}`)){events.push({round,name,text:`reached ${t} Grand Prix wins this season`,type:'WINS'});crossed.add(`wins-${t}`);}
+      for(const t of [5,10,15])if(podiums>=t&&!crossed.has(`podiums-${t}`)){events.push({round,name,text:`reached ${t} podiums this season`,type:'PODIUMS'});crossed.add(`podiums-${t}`);}
+      for(const t of [1,5,10])if(poles>=t&&!crossed.has(`poles-${t}`)){events.push({round,name,text:t===1?'took a first pole of the season':`reached ${t} pole positions this season`,type:'POLES'});crossed.add(`poles-${t}`);}
+    });
+  });
+  return events.sort((a,b)=>b.round-a.round||a.name.localeCompare(b.name)).slice(0,12);
+}
+function renderFormCenter(){
+  const hero=$('#formHero');if(!hero)return;
+  const streaks=[['POINTS STREAK','points','consecutive scoring races'],['PODIUM STREAK','podium','consecutive podiums'],['TOP-5 STREAK','top5','consecutive top-five finishes'],['Q3 STREAK','q3','consecutive top-10 qualifying results']];
+  hero.innerHTML=streaks.map(([label,key,sub])=>{const x=streakLeader(key);return `<button class="form-hero-card" type="button" ${x?`data-driver-id="${esc(x.id)}"`:''}><small>${esc(label)}</small><strong>${esc(x?.label||'—')}</strong><b>${esc(x?.value||0)}</b><span>${esc(sub)}</span>${x?.team?`<em>${esc(x.team)}</em>`:''}</button>`}).join('');
+  const rounds=lastCompletedRounds(5),guide=$('#driverFormGuide');if(guide){
+    if(!rounds.length)guide.innerHTML='<p class="no-results">Form data will appear after races are completed.</p>';
+    else guide.innerHTML=`<div class="form-table-head"><span>Driver</span><span>Recent finishes</span><span>5R points</span></div>`+state.drivers.slice(0,12).map(d=>{const id=d.Driver.driverId,fin=recentDriverFinishes(id,rounds),pts=pointsForDriverRounds(id,rounds);return `<button class="form-driver-row" type="button" data-driver-id="${esc(id)}"><span class="form-driver-name"><i style="background:${teamColor(constructorOfDriver(d))}"></i><strong>${esc(driverFullName(d))}</strong><small>${esc(constructorOfDriver(d))}</small></span><span class="finish-chips">${fin.map(x=>{const pos=String(x.position);const label=/^\d+$/.test(pos)?`P${pos}`:(pos==='R'?'RET':pos);return `<b title="${esc(x.race)}">${esc(label)}</b>`}).join('')}</span><span class="form-points">${esc(pts)}<small>PTS</small></span></button>`}).join('');
+  }
+  const team=$('#teamFormLeaders');if(team)team.innerHTML=leaderRows(teamMomentum(),'constructor',' pts');
+  const feed=$('#formMilestones');if(feed){const events=milestoneEvents();feed.innerHTML=events.length?events.map(x=>{const race=state.races.find(r=>Number(r.round)===x.round);return `<div class="form-milestone"><span class="milestone-round">R${esc(x.round)}</span><div><small>${esc(x.type)} · ${esc(race?.raceName||`Round ${x.round}`)}</small><strong>${esc(x.name)}</strong><p>${esc(x.text)}</p></div></div>`}).join(''):'<p class="no-results">Milestones will appear as the selected season develops.</p>';}
+}
+
+function drawShareText(ctx,text,x,y,maxWidth,lineHeight,maxLines=2){const words=String(text||'').split(/\s+/);let line='',lines=[];for(const word of words){const test=line?`${line} ${word}`:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;}if(line)lines.push(line);lines=lines.slice(0,maxLines);lines.forEach((l,i)=>ctx.fillText(l,x,y+i*lineHeight));return y+lines.length*lineHeight;}
+function buildShareCanvas({kicker,title,subtitle,columns=[],stats=[],footer='F1 Pulse · fan dashboard'}){
+  const c=document.createElement('canvas');c.width=1200;c.height=630;const x=c.getContext('2d');
+  const g=x.createLinearGradient(0,0,1200,630);g.addColorStop(0,'#03101f');g.addColorStop(.58,'#071a2d');g.addColorStop(1,'#020711');x.fillStyle=g;x.fillRect(0,0,1200,630);
+  x.fillStyle='#2495ff';x.fillRect(0,0,14,630);x.globalAlpha=.12;x.strokeStyle='#63b8ff';x.lineWidth=28;x.beginPath();x.arc(1050,105,185,0,Math.PI*2);x.stroke();x.globalAlpha=1;
+  x.fillStyle='#63b8ff';x.font='900 24px Arial';x.fillText(String(kicker||'F1 PULSE').toUpperCase(),64,70);
+  x.fillStyle='#f5f9ff';x.font='900 italic 54px Arial';let yy=drawShareText(x,title,64,145,1070,60,2);
+  x.fillStyle='#8fa9c2';x.font='700 24px Arial';yy=drawShareText(x,subtitle,64,yy+10,1070,32,2)+20;
+  const colW=columns.length?Math.floor(1070/columns.length):0;columns.forEach((col,i)=>{const bx=64+i*colW;x.fillStyle='rgba(12,35,59,.85)';x.strokeStyle='rgba(99,184,255,.25)';x.lineWidth=2;x.beginPath();if(x.roundRect)x.roundRect(bx,yy,colW-18,135,18);else x.rect(bx,yy,colW-18,135);x.fill();x.stroke();x.fillStyle='#7ca3c5';x.font='800 18px Arial';x.fillText(String(col.label||'').toUpperCase(),bx+22,yy+34);x.fillStyle='#fff';x.font='900 31px Arial';drawShareText(x,col.value,bx+22,yy+73,colW-62,34,2);});
+  const statY=yy+(columns.length?165:0);x.fillStyle='#d9ebfb';x.font='800 23px Arial';stats.slice(0,4).forEach((s,i)=>x.fillText(s,64,statY+i*36));
+  x.fillStyle='#6888a4';x.font='700 18px Arial';x.fillText(footer,64,590);x.textAlign='right';x.fillStyle='#63b8ff';x.font='900 italic 34px Arial';x.fillText('F1 PULSE',1135,590);x.textAlign='left';return c;
+}
+async function shareCanvas(canvas,filename,title){
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png',.95));if(!blob)return toast('Unable to create share card');let file=null;try{file=new File([blob],filename,{type:'image/png'});}catch(_){}
+  try{if(file&&navigator.share&&navigator.canShare?.({files:[file]})){await navigator.share({title,files:[file]});toast('Share card ready');return;}}catch(err){if(err?.name==='AbortError')return;console.warn('Share failed, using download',err);}
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);toast('Share card downloaded');
+}
+function shareComparisonCard(){
+  if(!state.compareA||!state.compareB)return toast('Choose two competitors first');const kind=state.compareType,A=compareStatsFor(state.compareA,kind),B=compareStatsFor(state.compareB,kind),an=comparisonName(state.compareA,kind),bn=comparisonName(state.compareB,kind);
+  const canvas=buildShareCanvas({kicker:`${state.season} · HEAD-TO-HEAD`,title:`${an} vs ${bn}`,subtitle:kind==='constructors'?'Constructor comparison':'Driver comparison',columns:[{label:an,value:`${A.points} PTS · P${A.standing?.position||'—'}`},{label:bn,value:`${B.points} PTS · P${B.standing?.position||'—'}`}],stats:[`Wins  ${A.wins} — ${B.wins}`,`Podiums  ${A.podiums} — ${B.podiums}`,`Poles  ${A.poles} — ${B.poles}`,`Fastest laps  ${A.fastest} — ${B.fastest}`]});shareCanvas(canvas,`f1-pulse-${state.season}-${an}-vs-${bn}.png`.replace(/[^a-z0-9.-]+/gi,'-').toLowerCase(),'F1 Pulse Head-to-Head');
+}
+function sharePredictionCard(key){
+  const pick=loadPicks().find(p=>p.key===key);if(!pick)return toast('Saved prediction not found');const scored=scorePick(pick),names=pick.podiumNames||pick.podium.map(nameForDriverId),subtitle=scored?`Result scored · ${scored.score} / 9 points`:'Prediction saved · awaiting race result';
+  const canvas=buildShareCanvas({kicker:`${pick.season} · FAN PICKS`,title:pick.raceName||'Grand Prix prediction',subtitle,columns:names.map((n,i)=>({label:`P${i+1}`,value:n})),stats:scored?[`${scored.exact} exact podium position${scored.exact===1?'':'s'}`,scored.score===9?'PERFECT PODIUM · 9 / 9':'F1 Pulse prediction score']:['Locked at scheduled race start','3 pts exact · 1 pt podium driver'],footer:'F1 Pulse · Fan Picks'});shareCanvas(canvas,`f1-pulse-pick-${pick.season}-round-${pick.round}.png`,'F1 Pulse Fan Pick');
+}

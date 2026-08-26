@@ -1,4 +1,4 @@
-# F1 Pulse v1.8.2
+# F1 Pulse v1.9.0
 
 F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static hosting such as GitHub Pages.
 
@@ -15,6 +15,9 @@ F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static 
 - Live Race Weekend Center
 - Championship Scenario / Points Calculator
 - My F1 favorites dashboard with browser-local persistence
+- F1 News & Headlines feed
+- Driver/constructor form, streaks and season milestones
+- Shareable Head-to-Head and Fan Picks cards
 
 ## Live Race Weekend Center (v1.5.0)
 
@@ -55,7 +58,7 @@ In GitHub:
 3. Select **main** and **/ (root)**.
 4. Save.
 
-The site uses versioned assets (`styles.css?v=1.7.0` and `app.js?v=1.7.0`) to reduce stale browser/GitHub Pages caching after deployment.
+The site uses versioned assets (`styles.css?v=1.9.0` and `app.js?v=1.9.0`) to reduce stale browser/GitHub Pages caching after deployment.
 
 ## Notes
 
@@ -124,3 +127,26 @@ F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA,
 - Selected-season Records milestones remain live from Jolpica.
 - Bumped Records cache to v3 and page assets to v1.8.2.
 - Prevents a single historical API failure from blanking all six Records panels.
+
+
+## v1.9.0 — News, Form & Share Cards
+
+### F1 News & Headlines
+- Dedicated live paddock-news view using the ESPN Formula 1 news JSON feed.
+- 15-minute browser cache and manual refresh.
+- Direct story links to the original publisher.
+- Formula1.com and FIA source shortcuts.
+- News failures are isolated from standings and race-data loading.
+
+### Form, Streaks & Milestones
+- Current points, podium, top-five and Q3 streak leaders.
+- Last-five-round driver form guide with race finishes and combined race/Sprint points.
+- Constructor momentum leaderboard over the last five completed rounds.
+- Automatically detected season milestones such as first win/podium/pole and points/win/podium/pole thresholds.
+- Works with the selected current or historical season when source data is available.
+
+### Shareable fan cards
+- Generate a 1200×630 PNG Head-to-Head comparison card.
+- Generate a 1200×630 Fan Picks prediction/result card, including post-race score when available.
+- Uses the Web Share API with image files on supported browsers; otherwise downloads the PNG locally.
+- No external image-generation service or backend is required.
