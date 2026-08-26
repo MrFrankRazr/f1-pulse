@@ -1,5 +1,5 @@
 const API = 'https://api.jolpi.ca/ergast/f1';
-const state = { drivers: [], teams: [], races: [], winners: [], season: new Date().getFullYear(), filter: 'all', weekendCache: new Map() };
+const state = { drivers: [], teams: [], races: [], winners: [], season: new Date().getFullYear(), filter: 'all', weekendCache: new Map(), profileCache: new Map() };
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
@@ -67,14 +67,14 @@ function renderLeaderStrip(){
   $('#leaderStrip').innerHTML=`<div class="mini-stat"><small>Drivers' Leader</small><strong>${d?esc(driverFullName(d)):'—'}</strong><em>${d?esc(d.points):'0'} PTS</em></div><div class="mini-stat"><small>Constructors' Leader</small><strong>${t?esc(t.Constructor.name):'—'}</strong><em>${t?esc(t.points):'0'} PTS</em></div><div class="mini-stat"><small>Races Complete</small><strong>${completed} / ${state.races.length}</strong><em>${state.races.length-completed} TO GO</em></div><div class="mini-stat"><small>Next Stop</small><strong>${nr?esc(nr.Circuit.Location.country):'Season complete'}</strong><em>${nr?esc(fmtRaceDate(raceDateTime(nr))):'—'}</em></div>`;
 }
 function standingRows(items,type='driver',limit){
-  return items.slice(0,limit||items.length).map(x=> type==='driver' ? `<div class="standing-row"><div class="pos">${esc(x.position)}</div><div class="competitor"><b>${esc(driverFullName(x))}</b><small>${esc(constructorOfDriver(x))}</small></div><div class="points">${esc(x.points)}<small>PTS</small></div></div>` : `<div class="standing-row"><div class="pos">${esc(x.position)}</div><div class="competitor"><b>${esc(x.Constructor.name)}</b><small>${esc(x.Constructor.nationality)}</small></div><div class="points">${esc(x.points)}<small>PTS</small></div></div>`).join('');
+  return items.slice(0,limit||items.length).map(x=> type==='driver' ? `<button class="standing-row standing-link" type="button" data-driver-id="${esc(x.Driver.driverId)}"><div class="pos">${esc(x.position)}</div><div class="competitor"><b>${esc(driverFullName(x))}</b><small>${esc(constructorOfDriver(x))}</small></div><div class="points">${esc(x.points)}<small>PTS</small></div></button>` : `<button class="standing-row standing-link" type="button" data-constructor-id="${esc(x.Constructor.constructorId)}"><div class="pos">${esc(x.position)}</div><div class="competitor"><b>${esc(x.Constructor.name)}</b><small>${esc(x.Constructor.nationality)}</small></div><div class="points">${esc(x.points)}<small>PTS</small></div></button>`).join('');
 }
 function renderHomeStandings(){ $('#homeDrivers').innerHTML=standingRows(state.drivers,'driver',5); $('#homeTeams').innerHTML=standingRows(state.teams,'team',5); }
 function renderDriverTable(){
-  $('#driverTable').innerHTML=`<div class="table-row header"><span>Pos</span><span>Driver</span><span>Constructor</span><span>Wins</span><span>Points</span></div>`+state.drivers.map(d=>`<div class="table-row"><span class="num">${esc(d.position)}</span><span class="driver-name"><i class="team-accent" style="background:${teamColor(constructorOfDriver(d))}"></i>${esc(driverFullName(d))}<small>${esc(d.Driver.nationality)}</small></span><span>${esc(constructorOfDriver(d))}</span><span>${esc(d.wins)}</span><span class="points">${esc(d.points)}</span></div>`).join('');
+  $('#driverTable').innerHTML=`<div class="table-row header"><span>Pos</span><span>Driver</span><span>Constructor</span><span>Wins</span><span>Points</span></div>`+state.drivers.map(d=>`<button class="table-row table-link" type="button" data-driver-id="${esc(d.Driver.driverId)}"><span class="num">${esc(d.position)}</span><span class="driver-name"><i class="team-accent" style="background:${teamColor(constructorOfDriver(d))}"></i>${esc(driverFullName(d))}<small>${esc(d.Driver.nationality)}</small></span><span>${esc(constructorOfDriver(d))}</span><span>${esc(d.wins)}</span><span class="points">${esc(d.points)}</span></button>`).join('');
 }
 function renderTeams(){
-  $('#teamCards').innerHTML=state.teams.map(t=>`<article class="team-card" style="border-left:4px solid ${teamColor(t.Constructor.name)}"><span class="team-rank">P${esc(t.position)} · ${esc(t.Constructor.nationality)}</span><h3>${esc(t.Constructor.name)}</h3><div class="team-meta"><div><b>${esc(t.points)}</b><small>POINTS</small></div><div><b>${esc(t.wins)}</b><small>WINS</small></div></div></article>`).join('');
+  $('#teamCards').innerHTML=state.teams.map(t=>`<button class="team-card team-link" type="button" data-constructor-id="${esc(t.Constructor.constructorId)}" style="border-left:4px solid ${teamColor(t.Constructor.name)}"><span class="team-rank">P${esc(t.position)} · ${esc(t.Constructor.nationality)}</span><h3>${esc(t.Constructor.name)}</h3><div class="team-meta"><div><b>${esc(t.points)}</b><small>POINTS</small></div><div><b>${esc(t.wins)}</b><small>WINS</small></div></div><span class="profile-hint">Open team profile →</span></button>`).join('');
 }
 function renderWinners(){
   $('#winnerGrid').innerHTML=state.winners.map(r=>{ const result=r.Results?.[0]; return `<article class="winner-card"><div class="winner-round"><span>Round ${esc(r.round)}</span><span>${esc(fmtRaceDate(raceDateTime(r)))}</span></div><h3>${esc(r.raceName)}</h3><p class="driver-win">${esc(result?`${result.Driver.givenName} ${result.Driver.familyName}`:'Winner unavailable')}</p><p>${esc(result?.Constructor?.name||'')} · ${esc(r.Circuit.circuitName)}</p><button class="card-detail-btn" type="button" data-race-round="${esc(r.round)}">Weekend details →</button></article>`; }).join('') || '<div class="error-box"><b>No race winners yet.</b>The season has not recorded a completed Grand Prix.</div>';
@@ -111,6 +111,84 @@ async function loadData(manual=false){
 function switchView(name){
   $$('.view').forEach(v=>v.classList.toggle('active',v.dataset.viewPanel===name)); $$('.nav-link').forEach(n=>n.classList.toggle('active',n.dataset.view===name)); window.scrollTo({top:0,behavior:'smooth'});
 }
+
+function calcAge(dob){
+  if(!dob) return '—';
+  const born=new Date(`${dob}T00:00:00`), now=new Date();
+  let age=now.getFullYear()-born.getFullYear();
+  if(now < new Date(now.getFullYear(),born.getMonth(),born.getDate())) age--;
+  return age;
+}
+function raceResultItems(races){
+  return races.flatMap(r=>(r.Results||[]).map(x=>({race:r,result:x}))).sort((a,b)=>Number(a.race.round)-Number(b.race.round));
+}
+function qualifyingResultItems(races){
+  return races.flatMap(r=>(r.QualifyingResults||[]).map(x=>({race:r,result:x}))).sort((a,b)=>Number(a.race.round)-Number(b.race.round));
+}
+function statNumber(items,predicate){ return items.filter(predicate).length; }
+function averagePosition(items){
+  const vals=items.map(x=>Number(x.result.position)).filter(Number.isFinite);
+  return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):'—';
+}
+function bestPosition(items){
+  const vals=items.map(x=>Number(x.result.position)).filter(Number.isFinite);
+  return vals.length?Math.min(...vals):'—';
+}
+function recentForm(items,count=6){
+  const last=items.slice(-count).reverse();
+  if(!last.length) return '<p class="no-results">No completed races yet this season.</p>';
+  return `<div class="form-list">${last.map(({race,result})=>`<div class="form-row"><div><strong>${esc(race.raceName)}</strong><small>Round ${esc(race.round)} · ${esc(result.Constructor?.name||'')}</small></div><span class="finish-chip ${Number(result.position)<=3?'podium':''}">P${esc(result.positionText||result.position)}</span></div>`).join('')}</div>`;
+}
+function profileStats(stats){
+  return `<div class="profile-stat-grid">${stats.map(([label,value,sub])=>`<div class="profile-stat"><small>${esc(label)}</small><strong>${esc(value)}</strong>${sub?`<span>${esc(sub)}</span>`:''}</div>`).join('')}</div>`;
+}
+async function getDriverProfileData(driverId){
+  const key=`driver-${state.season}-${driverId}`;
+  if(state.profileCache.has(key)) return state.profileCache.get(key);
+  const [results,qualifying]=await Promise.allSettled([
+    getJson(`${state.season}/drivers/${encodeURIComponent(driverId)}/results.json?limit=100`),
+    getJson(`${state.season}/drivers/${encodeURIComponent(driverId)}/qualifying.json?limit=100`)
+  ]);
+  const data={results:results.status==='fulfilled'?parseRaces(results.value):[],qualifying:qualifying.status==='fulfilled'?parseRaces(qualifying.value):[]};
+  state.profileCache.set(key,data); return data;
+}
+async function getConstructorProfileData(constructorId){
+  const key=`constructor-${state.season}-${constructorId}`;
+  if(state.profileCache.has(key)) return state.profileCache.get(key);
+  const result=await getJson(`${state.season}/constructors/${encodeURIComponent(constructorId)}/results.json?limit=200`);
+  const data={results:parseRaces(result)}; state.profileCache.set(key,data); return data;
+}
+function openProfileShell(){
+  const modal=$('#profileModal'); modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); document.body.classList.add('modal-open');
+}
+async function openDriverProfile(driverId){
+  const standing=state.drivers.find(d=>d.Driver.driverId===driverId); if(!standing) return;
+  const d=standing.Driver, team=constructorOfDriver(standing), content=$('#profileModalContent'); openProfileShell();
+  content.innerHTML=`<div class="profile-loading"><p class="eyebrow">DRIVER PROFILE</p><h2 id="profileModalTitle">${esc(driverFullName(standing))}</h2><div class="skeleton tall"></div></div>`;
+  try{
+    const data=await getDriverProfileData(driverId), results=raceResultItems(data.results), quali=qualifyingResultItems(data.qualifying);
+    const podiums=statNumber(results,x=>Number(x.result.position)<=3), wins=statNumber(results,x=>Number(x.result.position)===1), bestQuali=bestPosition(quali);
+    const number=d.permanentNumber?`#${d.permanentNumber}`:'NO. —', code=d.code||d.familyName.slice(0,3).toUpperCase();
+    content.innerHTML=`<div class="profile-hero" style="--profile-accent:${teamColor(team)}"><div class="profile-identity"><p class="eyebrow">${esc(state.season)} DRIVER PROFILE</p><div class="profile-code">${esc(code)}</div><h2 id="profileModalTitle">${esc(d.givenName)} <span>${esc(d.familyName)}</span></h2><p>${esc(d.nationality)} · ${esc(team)} · ${esc(number)}</p></div><div class="profile-rank"><small>CHAMPIONSHIP</small><strong>P${esc(standing.position)}</strong><span>${esc(standing.points)} PTS</span></div></div>${profileStats([['RACE WINS',wins,'this season'],['PODIUMS',podiums,'this season'],['BEST FINISH',bestPosition(results)==='—'?'—':`P${bestPosition(results)}`,'race'],['AVG FINISH',averagePosition(results),'race'],['BEST QUALI',bestQuali==='—'?'—':`P${bestQuali}`,'qualifying'],['AGE',calcAge(d.dateOfBirth),d.dateOfBirth||'']])}<div class="profile-columns"><section class="profile-panel"><div class="modal-section-head"><p class="eyebrow">CURRENT FORM</p><h3>Recent race finishes</h3></div>${recentForm(results)}</section><section class="profile-panel"><div class="modal-section-head"><p class="eyebrow">DRIVER DETAILS</p><h3>Season identity</h3></div><dl class="profile-details"><div><dt>Driver code</dt><dd>${esc(d.code||'—')}</dd></div><div><dt>Permanent number</dt><dd>${esc(d.permanentNumber||'—')}</dd></div><div><dt>Nationality</dt><dd>${esc(d.nationality||'—')}</dd></div><div><dt>Date of birth</dt><dd>${esc(d.dateOfBirth||'—')}</dd></div><div><dt>Constructor</dt><dd>${esc(team)}</dd></div></dl>${d.url?`<a class="profile-source-link" href="${esc(d.url)}" target="_blank" rel="noopener">Driver reference ↗</a>`:''}</section></div>`;
+  }catch(err){ content.innerHTML='<div class="error-box"><b>Driver profile unavailable.</b>The championship standings remain live.</div>'; }
+}
+async function openConstructorProfile(constructorId){
+  const standing=state.teams.find(t=>t.Constructor.constructorId===constructorId); if(!standing) return;
+  const c=standing.Constructor, content=$('#profileModalContent'); openProfileShell();
+  content.innerHTML=`<div class="profile-loading"><p class="eyebrow">CONSTRUCTOR PROFILE</p><h2 id="profileModalTitle">${esc(c.name)}</h2><div class="skeleton tall"></div></div>`;
+  try{
+    const data=await getConstructorProfileData(constructorId), all=raceResultItems(data.results), currentDrivers=state.drivers.filter(d=>(d.Constructors||[]).some(x=>x.constructorId===constructorId));
+    const podiums=statNumber(all,x=>Number(x.result.position)<=3), wins=statNumber(all,x=>Number(x.result.position)===1), avg=averagePosition(all);
+    const racesWithTeam=data.results.length;
+    const recentByRace=data.results.slice(-5).reverse();
+    content.innerHTML=`<div class="profile-hero constructor-profile" style="--profile-accent:${teamColor(c.name)}"><div class="profile-identity"><p class="eyebrow">${esc(state.season)} CONSTRUCTOR PROFILE</p><div class="profile-code">TEAM</div><h2 id="profileModalTitle">${esc(c.name)}</h2><p>${esc(c.nationality)} · Formula 1 World Championship</p></div><div class="profile-rank"><small>CHAMPIONSHIP</small><strong>P${esc(standing.position)}</strong><span>${esc(standing.points)} PTS</span></div></div>${profileStats([['RACE WINS',wins,'driver wins'],['PODIUMS',podiums,'combined'],['ROUNDS',racesWithTeam,'contested'],['AVG FINISH',avg,'combined'],['TEAM POINTS',standing.points,'championship'],['DRIVERS',currentDrivers.length,'current roster']])}<div class="profile-columns"><section class="profile-panel"><div class="modal-section-head"><p class="eyebrow">CURRENT LINE-UP</p><h3>Drivers</h3></div><div class="driver-roster">${currentDrivers.map(d=>`<button type="button" data-driver-id="${esc(d.Driver.driverId)}"><span>${esc(d.Driver.code||d.Driver.familyName.slice(0,3).toUpperCase())}</span><div><strong>${esc(driverFullName(d))}</strong><small>P${esc(d.position)} · ${esc(d.points)} pts</small></div></button>`).join('')||'<p class="no-results">Current roster unavailable.</p>'}</div></section><section class="profile-panel"><div class="modal-section-head"><p class="eyebrow">RECENT ROUNDS</p><h3>Team finishes</h3></div><div class="form-list">${recentByRace.map(r=>`<div class="team-form-row"><div><strong>${esc(r.raceName)}</strong><small>Round ${esc(r.round)}</small></div><div>${(r.Results||[]).map(x=>`<span>P${esc(x.position)}</span>`).join('')}</div></div>`).join('')||'<p class="no-results">No completed races yet.</p>'}</div>${c.url?`<a class="profile-source-link" href="${esc(c.url)}" target="_blank" rel="noopener">Constructor reference ↗</a>`:''}</section></div>`;
+  }catch(err){ content.innerHTML='<div class="error-box"><b>Constructor profile unavailable.</b>The championship standings remain live.</div>'; }
+}
+function closeProfile(){
+  const modal=$('#profileModal'); modal.classList.remove('open'); modal.setAttribute('aria-hidden','true');
+  if(!$('#raceModal').classList.contains('open')) document.body.classList.remove('modal-open');
+}
+
 function resultRows(items, mode='race'){
   if(!items?.length) return '<p class="no-results">Results will appear here after the session is completed.</p>';
   return `<div class="weekend-results">${items.slice(0,10).map(x=>{
@@ -160,7 +238,7 @@ async function openRaceWeekend(round){
   }
 }
 function closeRaceWeekend(){
-  const modal=$('#raceModal'); modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); document.body.classList.remove('modal-open');
+  const modal=$('#raceModal'); modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); if(!$('#profileModal').classList.contains('open')) document.body.classList.remove('modal-open');
 }
 
 $$('.nav-link').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
@@ -169,10 +247,13 @@ $$('.filter-btn').forEach(b=>b.addEventListener('click',()=>{state.filter=b.data
 $('#refreshBtn').addEventListener('click',()=>loadData(true));
 document.addEventListener('click',(e)=>{
   const raceBtn=e.target.closest('[data-race-round]'); if(raceBtn) openRaceWeekend(raceBtn.dataset.raceRound);
+  const driverBtn=e.target.closest('[data-driver-id]'); if(driverBtn) openDriverProfile(driverBtn.dataset.driverId);
+  const constructorBtn=e.target.closest('[data-constructor-id]'); if(constructorBtn) openConstructorProfile(constructorBtn.dataset.constructorId);
   if(e.target.closest('[data-close-race-modal]')) closeRaceWeekend();
+  if(e.target.closest('[data-close-profile-modal]')) closeProfile();
   const tab=e.target.closest('[data-result-tab]');
   if(tab){ const root=tab.closest('section'); root.querySelectorAll('.result-tab').forEach(x=>x.classList.toggle('active',x===tab)); root.querySelectorAll('.result-panel').forEach(x=>x.classList.toggle('active',x.dataset.resultPanel===tab.dataset.resultTab)); }
 });
-document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeRaceWeekend(); });
+document.addEventListener('keydown',(e)=>{ if(e.key==='Escape'){ closeRaceWeekend(); closeProfile(); } });
 setInterval(renderNextRace,1000); setInterval(()=>loadData(false),5*60*1000);
 loadData();

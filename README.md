@@ -68,3 +68,26 @@ Each race now opens an on-demand Weekend Hub with:
 - Direct venue map access
 
 Detailed session classifications are fetched only when a visitor opens a race weekend, keeping the initial page load lightweight.
+
+## Driver & Constructor Profiles
+
+Standings are now interactive. Selecting a driver or constructor opens an on-demand profile with current-season detail.
+
+Driver profiles include:
+- Championship position and points
+- Current constructor and permanent number
+- Season wins and podium count
+- Best and average race finish
+- Best qualifying position
+- Recent race form
+- Nationality, date of birth and driver reference link
+
+Constructor profiles include:
+- Championship position and points
+- Season wins and combined podium count
+- Current driver lineup
+- Recent two-car race finishes
+- Average combined finishing position
+- Constructor reference link
+
+Profile race and qualifying data is fetched only when a profile is opened and cached in the browser session to keep the dashboard responsive and reduce API requests.
