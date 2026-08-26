@@ -1,4 +1,4 @@
-# F1 Pulse v1.5.0
+# F1 Pulse v1.6.0
 
 F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static hosting such as GitHub Pages.
 
@@ -58,3 +58,10 @@ The site uses versioned assets (`styles.css?v=1.5.0` and `app.js?v=1.5.0`) to re
 ## Notes
 
 F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA, any Formula 1 team, or any driver.
+
+
+## v1.6.0 — Head-to-Head Comparisons
+- Driver vs Driver and Constructor vs Constructor comparison modes.
+- Season-synchronized points, wins, podiums, poles, fastest laps, average finish, best finish, and qualifying averages.
+- Round-by-round Grand Prix results and points, including Sprint points where available.
+- Direct links from comparison cards into existing driver and constructor profiles.

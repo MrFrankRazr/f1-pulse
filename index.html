@@ -7,7 +7,7 @@
   <meta name="description" content="F1 Pulse — current Formula 1 standings, results, winners, schedules and circuit information." />
   <title>F1 Pulse | Formula Racing Dashboard</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=1.5.0" />
+  <link rel="stylesheet" href="styles.css?v=1.6.0" />
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -22,6 +22,7 @@
       <button class="nav-link" data-view="drivers">Drivers</button>
       <button class="nav-link" data-view="teams">Constructors</button>
       <button class="nav-link" data-view="trends">Trends</button>
+      <button class="nav-link" data-view="compare">Compare</button>
       <button class="nav-link" data-view="winners">Winners</button>
       <button class="nav-link" data-view="calendar">Calendar</button>
       <button class="nav-link" data-view="circuits">Circuits</button>
@@ -124,6 +125,30 @@
       </div>
     </section>
 
+
+    <section class="view content-view" id="view-compare" data-view-panel="compare">
+      <div class="page-title"><div><p class="eyebrow">HEAD-TO-HEAD</p><h1>Compare the Grid</h1><p class="page-subtitle">Put two drivers or constructors side by side across the selected season.</p></div><span class="season-chip" id="compareSeasonChip"></span></div>
+      <section class="analytics-panel compare-control-panel">
+        <div class="compare-toolbar">
+          <div class="trend-toggle" role="group" aria-label="Comparison type">
+            <button class="analytics-toggle active" type="button" data-compare-type="drivers">Drivers</button>
+            <button class="analytics-toggle" type="button" data-compare-type="constructors">Constructors</button>
+          </div>
+          <div class="compare-selectors">
+            <label><span>Competitor A</span><select id="compareSelectA" aria-label="Select first competitor"></select></label>
+            <div class="versus-badge">VS</div>
+            <label><span>Competitor B</span><select id="compareSelectB" aria-label="Select second competitor"></select></label>
+          </div>
+        </div>
+      </section>
+      <div id="compareHero" class="compare-hero"><div class="skeleton tall"></div></div>
+      <div id="compareStats" class="compare-stat-grid"><div class="skeleton tall"></div></div>
+      <section class="analytics-panel compare-round-panel">
+        <div class="analytics-panel-head"><div><p class="eyebrow">ROUND BY ROUND</p><h2>Season battle</h2><p>Race finishes and points for both competitors across completed Grands Prix.</p></div></div>
+        <div id="compareRounds" class="compare-rounds"><div class="skeleton tall"></div></div>
+      </section>
+    </section>
+
     <section class="view content-view" id="view-winners" data-view-panel="winners">
       <div class="page-title"><div><p class="eyebrow">VICTORY LANE</p><h1>Race Winners</h1></div><span class="season-chip" id="winnerSeasonChip"></span></div>
       <div id="winnerGrid" class="winner-grid"><div class="skeleton tall"></div></div>
@@ -174,6 +199,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=1.5.0" defer></script>
+  <script src="app.js?v=1.6.0" defer></script>
 </body>
 </html>
