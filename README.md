@@ -1,6 +1,6 @@
 # F1 Pulse
 
-A deployable, responsive Formula 1 fan dashboard showing current driver standings, constructor standings, race winners, the current calendar, next-race countdown, podium results, and circuit/venue information.
+A deployable, responsive Formula 1 fan dashboard showing current driver and constructor standings, championship trends, season leaders, race winners, weekend results, the current calendar, next-race countdown, podium results, and circuit/venue information.
 
 ## Live data
 
@@ -10,6 +10,7 @@ The app reads current-season data from the public Jolpica F1 API (the maintained
 - Current constructor standings
 - Race winners/results
 - Current race schedule and circuit locations
+- Full season race results, qualifying results, sprint results and fastest-lap data
 
 The dashboard automatically refreshes every five minutes and has a manual Refresh Data button.
 
@@ -96,3 +97,17 @@ Profile race and qualifying data is fetched only when a profile is opened and ca
 
 This release cache-busts `app.js` and `styles.css` from `index.html` so GitHub Pages visitors receive the current profile-enabled assets immediately. It also makes delegated driver, constructor, and race click handling mutually exclusive and explicit.
 
+
+
+## v1.3.0 Championship Trends & Season Analytics
+
+The Trends view adds:
+- Driver and constructor championship points progression by completed round
+- Race-win, pole-position, podium and fastest-lap season leaders
+- Last-five-round driver points momentum
+- Click-through from analytics leaders to existing driver profiles
+- Native SVG charts with no external charting dependency
+- Driver/constructor chart toggle
+- Mobile bottom navigation so every view remains accessible on smaller screens
+
+Championship progression is reconstructed from race and sprint points for each completed round. API result endpoints are paginated in groups of 100 and throttled between requests to respect Jolpica's published request limits.

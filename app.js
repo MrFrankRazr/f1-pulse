@@ -1,5 +1,5 @@
 const API = 'https://api.jolpi.ca/ergast/f1';
-const state = { drivers: [], teams: [], races: [], winners: [], season: new Date().getFullYear(), filter: 'all', weekendCache: new Map(), profileCache: new Map() };
+const state = { drivers: [], teams: [], races: [], winners: [], season: new Date().getFullYear(), filter: 'all', trendType: 'drivers', analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map() };
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
@@ -16,6 +16,31 @@ async function getJson(path){
   const res = await fetch(`${API}/${path}`, {cache:'no-store'});
   if(!res.ok) throw new Error(`Data service returned ${res.status}`);
   return res.json();
+}
+const sleep = (ms) => new Promise(resolve=>setTimeout(resolve,ms));
+function mergePagedRaces(races,resultKey){
+  const merged=new Map();
+  races.forEach(r=>{
+    const key=`${r.season}-${r.round}`;
+    if(!merged.has(key)) merged.set(key,{...r,[resultKey]:[]});
+    const target=merged.get(key);
+    target[resultKey].push(...(r[resultKey]||[]));
+  });
+  return [...merged.values()].sort((a,b)=>Number(a.round)-Number(b.round));
+}
+async function getPagedRaces(path,resultKey){
+  let offset=0,total=Infinity; const races=[];
+  while(offset<total){
+    if(offset>0) await sleep(350);
+    const sep=path.includes('?')?'&':'?';
+    const data=await getJson(`${path}${sep}limit=100&offset=${offset}`);
+    races.push(...parseRaces(data));
+    total=Number(data?.MRData?.total||0);
+    const pageSize=Math.max(1,Number(data?.MRData?.limit||100));
+    offset+=pageSize;
+    if(!total) break;
+  }
+  return mergePagedRaces(races,resultKey);
 }
 function parseStandings(data,key){
   const list=data?.MRData?.StandingsTable?.StandingsLists?.[0];
@@ -89,22 +114,115 @@ function renderCalendar(){
   const filtered=state.races.filter(r=>{const completed=wins.has(String(r.round)) || raceDateTime(r).getTime()<now; return state.filter==='all'||(state.filter==='completed'&&completed)||(state.filter==='upcoming'&&!completed);});
   $('#calendarGrid').innerHTML=filtered.map(r=>{const w=wins.get(String(r.round)); const result=w?.Results?.[0]; const completed=!!w || raceDateTime(r).getTime()<now; const loc=r.Circuit.Location; const sessionCount=raceSessions(r).length; return `<article class="race-card ${completed?'completed':''}"><div class="round-box"><small>ROUND</small><b>${esc(r.round)}</b></div><div><h3>${esc(r.raceName)}</h3><p>${esc(r.Circuit.circuitName)}</p><p>${esc(loc.locality)}, ${esc(loc.country)}</p>${result?`<p class="winner-tag">Winner · ${esc(result.Driver.givenName)} ${esc(result.Driver.familyName)}</p>`:''}<p class="session-count">${sessionCount} scheduled sessions</p><button class="card-detail-btn" type="button" data-race-round="${esc(r.round)}">Weekend details →</button></div><div class="race-date"><strong>${esc(fmtRaceDate(raceDateTime(r)))}</strong><p>${completed?'Completed':'Upcoming'}</p></div></article>`;}).join('') || '<div class="error-box">No races match this filter.</div>';
 }
-function renderSeasonLabels(){
-  $('#seasonLabel').textContent=`${state.season} SEASON`; ['driver','team','winner','calendar'].forEach(x=>$(`#${x}SeasonChip`).textContent=state.season);
+
+function countBy(items, keyFn, predicate=()=>true){
+  const map=new Map();
+  items.forEach(item=>{ if(!predicate(item)) return; const key=keyFn(item); if(!key) return; map.set(key,(map.get(key)||0)+1); });
+  return map;
 }
-function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderWinners();renderLatestPodium();renderCalendar(); }
+function sortedCounts(map, labelFn){
+  return [...map.entries()].map(([id,value])=>({id,value,label:labelFn(id)})).sort((a,b)=>b.value-a.value || a.label.localeCompare(b.label));
+}
+function driverStandingById(id){ return state.drivers.find(d=>d.Driver.driverId===id); }
+function teamStandingById(id){ return state.teams.find(t=>t.Constructor.constructorId===id); }
+function driverLabel(id){ const d=driverStandingById(id); return d?driverFullName(d):id; }
+function teamLabel(id){ const t=teamStandingById(id); return t?.Constructor?.name||id; }
+function driverTeam(id){ const d=driverStandingById(id); return d?constructorOfDriver(d):''; }
+function allRaceItems(){ return raceResultItems(state.analytics.results); }
+function allQualiItems(){ return qualifyingResultItems(state.analytics.qualifying); }
+function allSprintItems(){ return state.analytics.sprints.flatMap(r=>(r.SprintResults||[]).map(x=>({race:r,result:x}))).sort((a,b)=>Number(a.race.round)-Number(b.race.round)); }
+function leaderRows(entries, kind='driver', suffix=''){
+  if(!entries.length) return '<p class="no-results">No completed sessions yet.</p>';
+  const max=Math.max(...entries.map(x=>x.value),1);
+  return entries.slice(0,5).map((x,i)=>{
+    const action=kind==='driver'?`data-driver-id="${esc(x.id)}"`:`data-constructor-id="${esc(x.id)}"`;
+    const accent=kind==='driver'?teamColor(driverTeam(x.id)):teamColor(teamLabel(x.id));
+    return `<button class="analytics-leader-row" type="button" ${action}><span class="analytics-rank">${i+1}</span><span class="analytics-name"><i style="background:${accent}"></i><strong>${esc(x.label)}</strong><small>${kind==='driver'?esc(driverTeam(x.id)):esc(teamStandingById(x.id)?.Constructor?.nationality||'')}</small></span><span class="analytics-bar"><i style="width:${Math.max(8,(x.value/max)*100)}%"></i></span><b>${esc(x.value)}${suffix}</b></button>`;
+  }).join('');
+}
+function pointsByRound(kind='drivers'){
+  const rounds=[...new Set([...state.analytics.results,...state.analytics.sprints].map(r=>Number(r.round)))].filter(Number.isFinite).sort((a,b)=>a-b);
+  const top=kind==='drivers'?state.drivers.slice(0,5):state.teams.slice(0,5);
+  const series=top.map(x=>({
+    id:kind==='drivers'?x.Driver.driverId:x.Constructor.constructorId,
+    label:kind==='drivers'?driverFullName(x):x.Constructor.name,
+    team:kind==='drivers'?constructorOfDriver(x):x.Constructor.name,
+    values:[], total:0
+  }));
+  const byId=new Map(series.map(x=>[x.id,x]));
+  rounds.forEach(round=>{
+    const race=state.analytics.results.find(r=>Number(r.round)===round);
+    (race?.Results||[]).forEach(result=>{
+      const id=kind==='drivers'?result.Driver?.driverId:result.Constructor?.constructorId;
+      if(byId.has(id)) byId.get(id).total+=Number(result.points)||0;
+    });
+    const sprint=state.analytics.sprints.find(r=>Number(r.round)===round);
+    (sprint?.SprintResults||[]).forEach(result=>{
+      const id=kind==='drivers'?result.Driver?.driverId:result.Constructor?.constructorId;
+      if(byId.has(id)) byId.get(id).total+=Number(result.points)||0;
+    });
+    series.forEach(x=>x.values.push(x.total));
+  });
+  return {rounds,series};
+}
+function trendColor(i){ return ['#63b8ff','#ff8700','#b47cff','#40d9a4','#f2d16b'][i%5]; }
+function renderTrendChart(){
+  const host=$('#trendChart'), legend=$('#trendLegend'); if(!host||!legend) return;
+  const {rounds,series}=pointsByRound(state.trendType);
+  if(!rounds.length){ host.innerHTML='<p class="no-results">Championship progression will appear after points are scored.</p>'; legend.innerHTML=''; return; }
+  const width=Math.max(820,rounds.length*72), height=390, pad={l:58,r:28,t:24,b:54};
+  const max=Math.max(1,...series.flatMap(s=>s.values));
+  const x=i=>pad.l+(i/(Math.max(1,rounds.length-1)))*(width-pad.l-pad.r);
+  const y=v=>pad.t+(1-v/max)*(height-pad.t-pad.b);
+  const grid=[0,.25,.5,.75,1].map(f=>{const v=Math.round(max*f);return `<line x1="${pad.l}" y1="${y(v)}" x2="${width-pad.r}" y2="${y(v)}" class="chart-grid"/><text x="${pad.l-12}" y="${y(v)+4}" class="chart-y" text-anchor="end">${v}</text>`}).join('');
+  const labels=rounds.map((r,i)=>{ const race=state.races.find(x=>Number(x.round)===r); const label=race?.Circuit?.Location?.country||`R${r}`; return `<text x="${x(i)}" y="${height-22}" class="chart-x" text-anchor="middle">${esc(label.slice(0,8))}</text>`; }).join('');
+  const lines=series.map((s,i)=>{ const pts=s.values.map((v,j)=>`${x(j)},${y(v)}`).join(' '); const dots=s.values.map((v,j)=>`<circle cx="${x(j)}" cy="${y(v)}" r="3.5" fill="${trendColor(i)}"><title>${esc(s.label)} · Round ${rounds[j]} · ${v} pts</title></circle>`).join(''); return `<polyline points="${pts}" fill="none" stroke="${trendColor(i)}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" class="trend-line"/>${dots}`; }).join('');
+  host.innerHTML=`<div class="trend-scroll"><svg class="trend-svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="${esc(state.trendType)} championship points progression">${grid}${labels}${lines}</svg></div>`;
+  legend.innerHTML=series.map((s,i)=>`<span><i style="background:${trendColor(i)}"></i>${esc(s.label)} <b>${esc(s.values.at(-1)||0)}</b></span>`).join('');
+}
+function lastFiveRoundPoints(){
+  const rounds=[...new Set(state.analytics.results.map(r=>Number(r.round)))].filter(Number.isFinite).sort((a,b)=>a-b).slice(-5);
+  const totals=new Map();
+  [...allRaceItems(),...allSprintItems()].forEach(({race,result})=>{ if(!rounds.includes(Number(race.round))) return; const id=result.Driver?.driverId; if(id) totals.set(id,(totals.get(id)||0)+(Number(result.points)||0)); });
+  return sortedCounts(totals,driverLabel);
+}
+function renderAnalytics(){
+  if(!$('#seasonLeaderCards')) return;
+  const races=allRaceItems(), quali=allQualiItems();
+  const wins=sortedCounts(countBy(races,x=>x.result.Driver?.driverId,x=>Number(x.result.position)===1),driverLabel);
+  const poles=sortedCounts(countBy(quali,x=>x.result.Driver?.driverId,x=>Number(x.result.position)===1),driverLabel);
+  const podiums=sortedCounts(countBy(races,x=>x.result.Driver?.driverId,x=>Number(x.result.position)<=3),driverLabel);
+  const fastest=sortedCounts(countBy(races,x=>x.result.Driver?.driverId,x=>String(x.result.FastestLap?.rank)==='1'),driverLabel);
+  const cards=[['RACE WINS',wins[0],'Victories'],['POLE POSITIONS',poles[0],'Qualifying P1'],['PODIUMS',podiums[0],'Top-three finishes'],['FASTEST LAPS',fastest[0],'Race fastest lap']];
+  $('#seasonLeaderCards').innerHTML=cards.map(([label,item,sub])=>item?`<button class="analytics-hero-card" type="button" data-driver-id="${esc(item.id)}" style="--leader-accent:${teamColor(driverTeam(item.id))}"><small>${esc(label)}</small><strong>${esc(item.label)}</strong><b>${esc(item.value)}</b><span>${esc(sub)} · View profile →</span></button>`:`<div class="analytics-hero-card empty"><small>${esc(label)}</small><strong>—</strong><b>0</b><span>Awaiting completed sessions</span></div>`).join('');
+  $('#poleLeaders').innerHTML=leaderRows(poles,'driver');
+  $('#fastestLapLeaders').innerHTML=leaderRows(fastest,'driver');
+  $('#podiumLeaders').innerHTML=leaderRows(podiums,'driver');
+  $('#formLeaders').innerHTML=leaderRows(lastFiveRoundPoints(),'driver',' pts');
+  renderTrendChart();
+}
+
+function renderSeasonLabels(){
+  $('#seasonLabel').textContent=`${state.season} SEASON`; ['driver','team','trend','winner','calendar'].forEach(x=>$(`#${x}SeasonChip`).textContent=state.season);
+}
+function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderAnalytics();renderWinners();renderLatestPodium();renderCalendar(); }
 function showError(err){
   setStatus('error','Offline'); toast('Unable to refresh live F1 data');
   const msg=`<div class="error-box"><b>Live data is temporarily unavailable.</b>${esc(err.message)}. Check your connection or try Refresh Data.</div>`;
-  ['#homeDrivers','#homeTeams','#driverTable','#teamCards','#winnerGrid','#calendarGrid','#latestPodium'].forEach(s=>$(s).innerHTML=msg);
+  ['#homeDrivers','#homeTeams','#driverTable','#teamCards','#seasonLeaderCards','#trendChart','#poleLeaders','#fastestLapLeaders','#podiumLeaders','#formLeaders','#winnerGrid','#calendarGrid','#latestPodium'].forEach(s=>$(s).innerHTML=msg);
 }
 async function loadData(manual=false){
   setStatus('','Syncing'); if(manual) toast('Refreshing championship data…');
   try{
-    const [drivers,teams,winners,schedule]=await Promise.all([
-      getJson('current/driverstandings.json'), getJson('current/constructorstandings.json'), getJson('current/results/1.json?limit=100'), getJson('current.json?limit=100')
+    const [drivers,teams,schedule]=await Promise.all([
+      getJson('current/driverstandings.json'), getJson('current/constructorstandings.json'), getJson('current.json?limit=100')
     ]);
-    state.drivers=parseStandings(drivers,'DriverStandings'); state.teams=parseStandings(teams,'ConstructorStandings'); state.winners=parseRaces(winners); state.races=parseRaces(schedule);
+    state.drivers=parseStandings(drivers,'DriverStandings'); state.teams=parseStandings(teams,'ConstructorStandings'); state.races=parseRaces(schedule);
+    await sleep(350);
+    state.analytics.results=await getPagedRaces('current/results.json','Results');
+    try{ await sleep(350); state.analytics.qualifying=await getPagedRaces('current/qualifying.json','QualifyingResults'); }catch(err){ console.warn('Qualifying analytics unavailable',err); state.analytics.qualifying=[]; }
+    try{ await sleep(350); state.analytics.sprints=await getPagedRaces('current/sprint.json','SprintResults'); }catch(err){ console.warn('Sprint analytics unavailable',err); state.analytics.sprints=[]; }
+    state.winners=state.analytics.results;
     renderAll(); setStatus('online','Live'); $('#lastUpdated').textContent=`Updated ${new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date())}`; if(manual) toast('F1 data refreshed');
   }catch(err){ console.error(err); showError(err); }
 }
@@ -256,6 +374,9 @@ document.addEventListener('click',(e)=>{
 
   const constructorBtn=e.target.closest('[data-constructor-id]');
   if(constructorBtn){ e.preventDefault(); openConstructorProfile(constructorBtn.dataset.constructorId); return; }
+
+  const trendBtn=e.target.closest('[data-trend-type]');
+  if(trendBtn){ state.trendType=trendBtn.dataset.trendType; $$('.analytics-toggle').forEach(x=>x.classList.toggle('active',x===trendBtn)); renderTrendChart(); return; }
 
   const raceBtn=e.target.closest('[data-race-round]');
   if(raceBtn){ e.preventDefault(); openRaceWeekend(raceBtn.dataset.raceRound); return; }

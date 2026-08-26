@@ -7,7 +7,7 @@
   <meta name="description" content="F1 Pulse — current Formula 1 standings, results, winners, schedules and circuit information." />
   <title>F1 Pulse | Formula Racing Dashboard</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=1.2.1" />
+  <link rel="stylesheet" href="styles.css?v=1.3.0" />
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -20,6 +20,7 @@
       <button class="nav-link active" data-view="home">Race Control</button>
       <button class="nav-link" data-view="drivers">Drivers</button>
       <button class="nav-link" data-view="teams">Constructors</button>
+      <button class="nav-link" data-view="trends">Trends</button>
       <button class="nav-link" data-view="winners">Winners</button>
       <button class="nav-link" data-view="calendar">Calendar</button>
     </nav>
@@ -76,6 +77,34 @@
       <div id="teamCards" class="team-grid"><div class="skeleton tall"></div></div>
     </section>
 
+
+    <section class="view content-view" id="view-trends" data-view-panel="trends">
+      <div class="page-title"><div><p class="eyebrow">SEASON INTELLIGENCE</p><h1>Championship Trends</h1></div><span class="season-chip" id="trendSeasonChip"></span></div>
+
+      <div id="seasonLeaderCards" class="analytics-hero-grid">
+        <div class="skeleton tall"></div>
+      </div>
+
+      <section class="analytics-panel trend-panel">
+        <div class="analytics-panel-head">
+          <div><p class="eyebrow">POINTS PROGRESSION</p><h2>Championship battle by round</h2><p>Race + sprint points accumulated through each completed round.</p></div>
+          <div class="trend-toggle" role="group" aria-label="Championship trend type">
+            <button class="analytics-toggle active" type="button" data-trend-type="drivers">Drivers</button>
+            <button class="analytics-toggle" type="button" data-trend-type="constructors">Constructors</button>
+          </div>
+        </div>
+        <div id="trendLegend" class="trend-legend"></div>
+        <div id="trendChart" class="trend-chart-shell"><div class="skeleton tall"></div></div>
+      </section>
+
+      <div class="analytics-grid">
+        <section class="analytics-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">ONE-LAP PACE</p><h2>Poles</h2></div></div><div id="poleLeaders" class="leaderboard-list"></div></section>
+        <section class="analytics-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">RACE PACE</p><h2>Fastest Laps</h2></div></div><div id="fastestLapLeaders" class="leaderboard-list"></div></section>
+        <section class="analytics-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">CONSISTENCY</p><h2>Podiums</h2></div></div><div id="podiumLeaders" class="leaderboard-list"></div></section>
+        <section class="analytics-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">MOMENTUM</p><h2>Last 5 Rounds</h2></div></div><div id="formLeaders" class="leaderboard-list"></div></section>
+      </div>
+    </section>
+
     <section class="view content-view" id="view-winners" data-view-panel="winners">
       <div class="page-title"><div><p class="eyebrow">VICTORY LANE</p><h1>Race Winners</h1></div><span class="season-chip" id="winnerSeasonChip"></span></div>
       <div id="winnerGrid" class="winner-grid"><div class="skeleton tall"></div></div>
@@ -111,6 +140,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=1.2.1" defer></script>
+  <script src="app.js?v=1.3.0" defer></script>
 </body>
 </html>
