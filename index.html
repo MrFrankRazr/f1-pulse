@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#030712" />
+  <meta name="description" content="F1 Pulse — current Formula 1 standings, results, winners, schedules and circuit information." />
+  <title>F1 Pulse | Formula Racing Dashboard</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="F1 Pulse home">
+      <span class="brand-mark">F1</span>
+      <span class="brand-name">PULSE</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <button class="nav-link active" data-view="home">Race Control</button>
+      <button class="nav-link" data-view="drivers">Drivers</button>
+      <button class="nav-link" data-view="teams">Constructors</button>
+      <button class="nav-link" data-view="winners">Winners</button>
+      <button class="nav-link" data-view="calendar">Calendar</button>
+    </nav>
+    <div class="live-status" title="Data refresh status">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">Connecting</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero view active" id="view-home" data-view-panel="home">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow"><span id="seasonLabel">CURRENT SEASON</span> · RACE CONTROL</p>
+          <h1>THE GRID.<br><span>LIVE.</span></h1>
+          <p class="hero-copy">Championship pressure, race winners, constructor battles and every circuit on the calendar — one dashboard built for race fans.</p>
+          <div class="hero-actions">
+            <button class="primary-btn" data-jump="drivers">View Standings</button>
+            <button class="ghost-btn" id="refreshBtn">Refresh Data</button>
+          </div>
+        </div>
+        <aside class="next-race-card" id="nextRaceCard">
+          <div class="skeleton tall"></div>
+        </aside>
+      </div>
+
+      <div class="stat-strip" id="leaderStrip">
+        <div class="mini-stat skeleton"></div><div class="mini-stat skeleton"></div><div class="mini-stat skeleton"></div><div class="mini-stat skeleton"></div>
+      </div>
+
+      <div class="section-head">
+        <div><p class="eyebrow">CHAMPIONSHIP SNAPSHOT</p><h2>Front of the field</h2></div>
+        <button class="text-btn" data-jump="drivers">Full standings →</button>
+      </div>
+      <div class="dashboard-grid">
+        <div class="panel"><div class="panel-head"><h3>Drivers</h3><span>Top 5</span></div><div id="homeDrivers"></div></div>
+        <div class="panel"><div class="panel-head"><h3>Constructors</h3><span>Top 5</span></div><div id="homeTeams"></div></div>
+      </div>
+
+      <div class="section-head recent-head">
+        <div><p class="eyebrow">LAST TIME OUT</p><h2>Latest race podium</h2></div>
+        <button class="text-btn" data-jump="winners">Season winners →</button>
+      </div>
+      <div id="latestPodium" class="podium-wrap"><div class="skeleton tall"></div></div>
+    </section>
+
+    <section class="view content-view" id="view-drivers" data-view-panel="drivers">
+      <div class="page-title"><div><p class="eyebrow">WORLD CHAMPIONSHIP</p><h1>Driver Standings</h1></div><span class="season-chip" id="driverSeasonChip"></span></div>
+      <div class="table-shell"><div id="driverTable" class="data-table"><div class="skeleton tall"></div></div></div>
+    </section>
+
+    <section class="view content-view" id="view-teams" data-view-panel="teams">
+      <div class="page-title"><div><p class="eyebrow">CONSTRUCTOR BATTLE</p><h1>Team Standings</h1></div><span class="season-chip" id="teamSeasonChip"></span></div>
+      <div id="teamCards" class="team-grid"><div class="skeleton tall"></div></div>
+    </section>
+
+    <section class="view content-view" id="view-winners" data-view-panel="winners">
+      <div class="page-title"><div><p class="eyebrow">VICTORY LANE</p><h1>Race Winners</h1></div><span class="season-chip" id="winnerSeasonChip"></span></div>
+      <div id="winnerGrid" class="winner-grid"><div class="skeleton tall"></div></div>
+    </section>
+
+    <section class="view content-view" id="view-calendar" data-view-panel="calendar">
+      <div class="page-title"><div><p class="eyebrow">AROUND THE WORLD</p><h1>Race Calendar & Venues</h1></div><span class="season-chip" id="calendarSeasonChip"></span></div>
+      <div class="calendar-tools"><button class="filter-btn active" data-filter="all">All</button><button class="filter-btn" data-filter="upcoming">Upcoming</button><button class="filter-btn" data-filter="completed">Completed</button></div>
+      <div id="calendarGrid" class="calendar-grid"><div class="skeleton tall"></div></div>
+    </section>
+  </main>
+
+  <footer>
+    <div><strong>F1 PULSE</strong><span>Independent race-data dashboard</span></div>
+    <p>Data: Jolpica F1 API. Unofficial fan project; not affiliated with Formula 1, FIA, teams, or drivers.</p>
+    <p id="lastUpdated">Waiting for data…</p>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
