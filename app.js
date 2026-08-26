@@ -1,6 +1,6 @@
 const API = 'https://api.jolpi.ca/ergast/f1';
 const CURRENT_YEAR = new Date().getFullYear();
-const state = { drivers: [], teams: [], races: [], winners: [], season: CURRENT_YEAR, filter: 'all', trendType: 'drivers', compareType: 'drivers', compareA: null, compareB: null, analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map(), circuitCache: new Map(), liveCenter: { weatherCache: new Map(), lastRound: null } };
+const state = { drivers: [], teams: [], races: [], winners: [], season: CURRENT_YEAR, filter: 'all', trendType: 'drivers', compareType: 'drivers', compareA: null, compareB: null, scenario: {a:null,b:null,raceA:1,raceB:2,sprintA:1,sprintB:2}, analytics: { results: [], qualifying: [], sprints: [] }, weekendCache: new Map(), profileCache: new Map(), circuitCache: new Map(), liveCenter: { weatherCache: new Map(), lastRound: null } };
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
@@ -347,14 +347,84 @@ function renderCompare(){
   renderCompareRounds(aId,bId,kind);
 }
 
+
+const FAVORITES_KEY='f1PulseFavoritesV1';
+function loadFavorites(){
+  try{ const x=JSON.parse(localStorage.getItem(FAVORITES_KEY)||'{}'); return {drivers:Array.isArray(x.drivers)?x.drivers:[],constructors:Array.isArray(x.constructors)?x.constructors:[],circuits:Array.isArray(x.circuits)?x.circuits:[]}; }
+  catch(_){ return {drivers:[],constructors:[],circuits:[]}; }
+}
+function saveFavorites(f){ try{localStorage.setItem(FAVORITES_KEY,JSON.stringify(f));}catch(_){} }
+function favoriteMeta(kind,id){
+  if(kind==='driver'){ const x=state.drivers.find(d=>d.Driver.driverId===id); return x?{id,label:driverFullName(x),sub:constructorOfDriver(x)}:{id,label:id,sub:'Driver'}; }
+  if(kind==='constructor'){ const x=state.teams.find(t=>t.Constructor.constructorId===id); return x?{id,label:x.Constructor.name,sub:x.Constructor.nationality}:{id,label:id,sub:'Constructor'}; }
+  const race=state.races.find(r=>r.Circuit?.circuitId===id); return race?{id,label:race.Circuit.circuitName,sub:`${race.Circuit.Location.locality}, ${race.Circuit.Location.country}`}:{id,label:id,sub:'Circuit'};
+}
+function addFavorite(kind,id){
+  if(!id)return; const f=loadFavorites(), key=kind==='driver'?'drivers':kind==='constructor'?'constructors':'circuits';
+  if(!f[key].some(x=>x.id===id)) f[key].push(favoriteMeta(kind,id)); saveFavorites(f); renderMyF1(); toast('Added to My F1');
+}
+function removeFavorite(kind,id){ const f=loadFavorites(),key=kind==='driver'?'drivers':kind==='constructor'?'constructors':'circuits'; f[key]=f[key].filter(x=>x.id!==id); saveFavorites(f);renderMyF1();toast('Removed from My F1'); }
+function renderFavoriteSelectors(){
+  const ds=$('#favoriteDriverSelect'),ts=$('#favoriteTeamSelect'),cs=$('#favoriteCircuitSelect');
+  if(ds) ds.innerHTML=state.drivers.map(d=>`<option value="${esc(d.Driver.driverId)}">${esc(driverFullName(d))}</option>`).join('');
+  if(ts) ts.innerHTML=state.teams.map(t=>`<option value="${esc(t.Constructor.constructorId)}">${esc(t.Constructor.name)}</option>`).join('');
+  if(cs){ const seen=new Set(); cs.innerHTML=state.races.filter(r=>{const id=r.Circuit?.circuitId;if(!id||seen.has(id))return false;seen.add(id);return true;}).map(r=>`<option value="${esc(r.Circuit.circuitId)}">${esc(r.Circuit.circuitName)}</option>`).join(''); }
+}
+function favoriteCard(item,kind){
+  let detail=item.sub||'',open='';
+  if(kind==='driver'){ const x=driverStandingById(item.id); if(x) detail=`P${x.position} · ${x.points} pts · ${constructorOfDriver(x)}`; open=`data-driver-id="${esc(item.id)}"`; }
+  else if(kind==='constructor'){ const x=teamStandingById(item.id); if(x) detail=`P${x.position} · ${x.points} pts · ${x.wins} wins`; open=`data-constructor-id="${esc(item.id)}"`; }
+  else { const r=state.races.find(x=>x.Circuit?.circuitId===item.id); if(r) detail=`${r.Circuit.Location.locality}, ${r.Circuit.Location.country} · Round ${r.round}`; open=`data-circuit-id="${esc(item.id)}"`; }
+  return `<div class="favorite-card"><button class="favorite-open" type="button" ${open}><strong>${esc(item.label)}</strong><small>${esc(detail)}${open?'':' · Not on selected season'}</small></button><button class="favorite-remove" type="button" data-remove-favorite="${kind}" data-favorite-id="${esc(item.id)}">Remove</button></div>`;
+}
+function renderMyF1(){
+  const host=$('#myF1Dashboard'); if(!host)return; renderFavoriteSelectors(); const f=loadFavorites();
+  const groups=[['drivers','FAVORITE DRIVERS','Drivers'],['constructors','FAVORITE TEAMS','Constructors'],['circuits','FAVORITE CIRCUITS','Circuits']];
+  host.innerHTML=groups.map(([key,eye,title])=>`<section class="analytics-panel favorite-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">${eye}</p><h2>${title}</h2></div><span>${f[key].length}</span></div><div class="favorite-list">${f[key].length?f[key].map(x=>favoriteCard(x,key==='drivers'?'driver':key==='constructors'?'constructor':'circuit')).join(''):`<div class="favorite-empty">Nothing pinned yet. Use the controls above to build your personal paddock.</div>`}</div></section>`).join('');
+}
+function inferPointsMap(kind='race'){
+  const map=new Map(), items=kind==='sprint'?allSprintItems():allRaceItems();
+  items.forEach(({result})=>{ const p=Number(result.position),pts=Number(result.points); if(Number.isFinite(p)&&Number.isFinite(pts)) map.set(p,Math.max(map.get(p)||0,pts)); });
+  if(!map.size && kind==='race') [25,18,15,12,10,8,6,4,2,1].forEach((v,i)=>map.set(i+1,v));
+  if(!map.size && kind==='sprint') [8,7,6,5,4,3,2,1].forEach((v,i)=>map.set(i+1,v));
+  return map;
+}
+function scenarioPositionOptions(max=20,none=false){ return `${none?'<option value="0">Not selected</option>':''}${Array.from({length:max},(_,i)=>`<option value="${i+1}">P${i+1}</option>`).join('')}`; }
+function scenarioRace(){ return state.season===CURRENT_YEAR?(upcomingRace()||null):null; }
+function renderScenarioControls(){
+  const a=$('#scenarioDriverA'),b=$('#scenarioDriverB'),ra=$('#scenarioRaceA'),rb=$('#scenarioRaceB'),sa=$('#scenarioSprintA'),sb=$('#scenarioSprintB'); if(!a||!b)return false;
+  if(state.drivers.length<2){ $('#scenarioResults').innerHTML='<div class="error-box"><b>Scenario unavailable.</b>At least two drivers are required.</div>';return false; }
+  const opts=state.drivers.map(d=>`<option value="${esc(d.Driver.driverId)}">${esc(driverFullName(d))}</option>`).join('');
+  if(!state.scenario.a||!driverStandingById(state.scenario.a))state.scenario.a=state.drivers[0].Driver.driverId;
+  if(!state.scenario.b||!driverStandingById(state.scenario.b)||state.scenario.b===state.scenario.a)state.scenario.b=state.drivers[1].Driver.driverId;
+  a.innerHTML=opts;b.innerHTML=opts;a.value=state.scenario.a;b.value=state.scenario.b;
+  const max=Math.max(20,state.drivers.length);ra.innerHTML=scenarioPositionOptions(max);rb.innerHTML=scenarioPositionOptions(max);ra.value=state.scenario.raceA;rb.value=state.scenario.raceB;
+  const r=scenarioRace(),hasSprint=!!r?.Sprint || (state.season!==CURRENT_YEAR && state.analytics.sprints.length>0); $$('.scenario-sprint-field').forEach(x=>x.classList.toggle('hidden',!hasSprint));
+  sa.innerHTML=scenarioPositionOptions(8,true);sb.innerHTML=scenarioPositionOptions(8,true);sa.value=hasSprint?state.scenario.sprintA:0;sb.value=hasSprint?state.scenario.sprintB:0;
+  $('#scenarioRaceLabel').textContent=r?`${r.raceName} · Round ${r.round}${hasSprint?' · Sprint weekend':''}`:`Hypothetical next round after the ${state.season} standings`;
+  const note=$('#scenarioRuleNote'); note.textContent=`Points are inferred from results already published for ${state.season}. Historical seasons with dropped-score rules, half-points or special regulations are projections, not official retroactive standings.`;
+  return true;
+}
+function projectedDriverStandings(){
+  const raceMap=inferPointsMap('race'),sprintMap=inferPointsMap('sprint'),add=new Map();
+  const put=(id,racePos,sprintPos)=>add.set(id,(raceMap.get(Number(racePos))||0)+(Number(sprintPos)>0?(sprintMap.get(Number(sprintPos))||0):0));
+  put(state.scenario.a,state.scenario.raceA,state.scenario.sprintA);put(state.scenario.b,state.scenario.raceB,state.scenario.sprintB);
+  return state.drivers.map(d=>({id:d.Driver.driverId,name:driverFullName(d),team:constructorOfDriver(d),oldPos:Number(d.position),oldPoints:Number(d.points)||0,added:add.get(d.Driver.driverId)||0})).map(x=>({...x,points:x.oldPoints+x.added})).sort((a,b)=>b.points-a.points||a.oldPos-b.oldPos).map((x,i)=>({...x,newPos:i+1}));
+}
+function renderScenario(){
+  const host=$('#scenarioResults');if(!host)return;if(!renderScenarioControls())return; const rows=projectedDriverStandings(),focus=new Set([state.scenario.a,state.scenario.b]);
+  const A=rows.find(x=>x.id===state.scenario.a),B=rows.find(x=>x.id===state.scenario.b); const summary=[A,B].map(x=>`<div><small>${esc(x.name)}</small><strong>P${x.newPos} · ${x.points} pts</strong><span>${x.added?`+${x.added} scenario pts`:'No added points'}</span></div>`).join('');
+  host.innerHTML=`<div class="scenario-summary">${summary}</div><div class="scenario-board">${rows.slice(0,10).map(x=>{const move=x.oldPos-x.newPos,cls=move>0?'up':move<0?'down':'';return `<div class="scenario-row ${focus.has(x.id)?'projected':''}"><span class="rank">P${x.newPos}</span><div><strong>${esc(x.name)}</strong><small>${esc(x.team)} · ${x.points} pts${x.added?` · +${x.added}`:''}</small></div><span class="delta ${cls}">${move>0?`▲ ${move}`:move<0?`▼ ${Math.abs(move)}`:'—'}</span></div>`}).join('')}</div>`;
+}
+
 function renderSeasonLabels(){
   $('#seasonLabel').textContent=`${state.season} SEASON`; ['live','driver','team','trend','compare','winner','calendar','circuit'].forEach(x=>{ const el=$(`#${x}SeasonChip`); if(el) el.textContent=state.season; });
 }
-function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderAnalytics();renderCompare();renderWinners();renderLatestPodium();renderCalendar();renderCircuits(); if($('#view-live')?.classList.contains('active')) renderLiveCenter(false); }
+function renderAll(){ renderSeasonLabels();renderNextRace();renderLeaderStrip();renderHomeStandings();renderDriverTable();renderTeams();renderAnalytics();renderCompare();renderScenario();renderMyF1();renderWinners();renderLatestPodium();renderCalendar();renderCircuits(); if($('#view-live')?.classList.contains('active')) renderLiveCenter(false); }
 function showError(err){
   setStatus('error','Offline'); toast('Unable to refresh live F1 data');
   const msg=`<div class="error-box"><b>Live data is temporarily unavailable.</b>${esc(err.message)}. Check your connection or try Refresh Data.</div>`;
-  ['#homeDrivers','#homeTeams','#driverTable','#teamCards','#seasonLeaderCards','#trendChart','#poleLeaders','#fastestLapLeaders','#podiumLeaders','#formLeaders','#compareHero','#compareStats','#compareRounds','#winnerGrid','#calendarGrid','#circuitGrid','#latestPodium'].forEach(s=>$(s).innerHTML=msg);
+  ['#homeDrivers','#homeTeams','#driverTable','#teamCards','#seasonLeaderCards','#trendChart','#poleLeaders','#fastestLapLeaders','#podiumLeaders','#formLeaders','#compareHero','#compareStats','#compareRounds','#scenarioResults','#myF1Dashboard','#winnerGrid','#calendarGrid','#circuitGrid','#latestPodium'].forEach(s=>$(s).innerHTML=msg);
 }
 async function loadData(manual=false){
   setStatus('','Syncing'); if(manual) toast(`Refreshing ${state.season} F1 data…`);
@@ -386,7 +456,7 @@ function initSeasonSelector(){
   const select=$('#seasonSelect'); if(!select) return;
   select.innerHTML=Array.from({length:CURRENT_YEAR-1949},(_,i)=>CURRENT_YEAR-i).map(y=>`<option value="${y}" ${y===state.season?'selected':''}>${y}${y===CURRENT_YEAR?' · Current':''}</option>`).join('');
   select.addEventListener('change',()=>{
-    state.season=Number(select.value); state.filter='all'; state.weekendCache.clear(); state.profileCache.clear(); state.circuitCache.clear(); state.liveCenter.lastRound=null; state.compareA=null; state.compareB=null;
+    state.season=Number(select.value); state.filter='all'; state.weekendCache.clear(); state.profileCache.clear(); state.circuitCache.clear(); state.liveCenter.lastRound=null; state.compareA=null; state.compareB=null; state.scenario.a=null; state.scenario.b=null;
     $$('.filter-btn').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));
     loadData(false); switchView('home');
   });
@@ -643,8 +713,21 @@ const compareA=$('#compareSelectA'), compareB=$('#compareSelectB');
 if(compareA) compareA.addEventListener('change',()=>{ state.compareA=compareA.value; if(state.compareA===state.compareB){const alt=compareOptions().find(x=>x.id!==state.compareA); if(alt) state.compareB=alt.id;} renderCompare(); });
 if(compareB) compareB.addEventListener('change',()=>{ state.compareB=compareB.value; if(state.compareB===state.compareA){const alt=[...compareOptions()].reverse().find(x=>x.id!==state.compareB); if(alt) state.compareA=alt.id;} renderCompare(); });
 
+const scenarioReset=$('#scenarioReset'); if(scenarioReset) scenarioReset.addEventListener('click',()=>{state.scenario={a:state.drivers[0]?.Driver?.driverId||null,b:state.drivers[1]?.Driver?.driverId||null,raceA:1,raceB:2,sprintA:1,sprintB:2};renderScenario();});
+document.addEventListener('change',(e)=>{
+  const id=e.target?.id;
+  if(id==='scenarioDriverA'){state.scenario.a=e.target.value;if(state.scenario.a===state.scenario.b)state.scenario.b=state.drivers.find(d=>d.Driver.driverId!==state.scenario.a)?.Driver.driverId;renderScenario();}
+  else if(id==='scenarioDriverB'){state.scenario.b=e.target.value;if(state.scenario.b===state.scenario.a)state.scenario.a=state.drivers.find(d=>d.Driver.driverId!==state.scenario.b)?.Driver.driverId;renderScenario();}
+  else if(id==='scenarioRaceA'){state.scenario.raceA=Number(e.target.value);if(state.scenario.raceA===state.scenario.raceB)state.scenario.raceB=state.scenario.raceA===1?2:1;renderScenario();}
+  else if(id==='scenarioRaceB'){state.scenario.raceB=Number(e.target.value);if(state.scenario.raceB===state.scenario.raceA)state.scenario.raceA=state.scenario.raceB===1?2:1;renderScenario();}
+  else if(id==='scenarioSprintA'){state.scenario.sprintA=Number(e.target.value);if(state.scenario.sprintA&&state.scenario.sprintA===state.scenario.sprintB)state.scenario.sprintB=state.scenario.sprintA===1?2:1;renderScenario();}
+  else if(id==='scenarioSprintB'){state.scenario.sprintB=Number(e.target.value);if(state.scenario.sprintB&&state.scenario.sprintB===state.scenario.sprintA)state.scenario.sprintA=state.scenario.sprintB===1?2:1;renderScenario();}
+});
+
 document.addEventListener('click',(e)=>{
   const jump=e.target.closest('[data-jump]'); if(jump){ switchView(jump.dataset.jump); return; }
+  const addFav=e.target.closest('[data-add-favorite]'); if(addFav){ const kind=addFav.dataset.addFavorite; const select=kind==='driver'?$('#favoriteDriverSelect'):kind==='constructor'?$('#favoriteTeamSelect'):$('#favoriteCircuitSelect'); addFavorite(kind,select?.value); return; }
+  const removeFav=e.target.closest('[data-remove-favorite]'); if(removeFav){ removeFavorite(removeFav.dataset.removeFavorite,removeFav.dataset.favoriteId); return; }
   const closeCircuitBtn=e.target.closest('[data-close-circuit-modal]'); if(closeCircuitBtn){ closeCircuit(); return; }
   const closeRace=e.target.closest('[data-close-race-modal]');
   if(closeRace){ closeRaceWeekend(); return; }

@@ -1,4 +1,4 @@
-# F1 Pulse v1.6.0
+# F1 Pulse v1.7.0
 
 F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static hosting such as GitHub Pages.
 
@@ -13,6 +13,8 @@ F1 Pulse is an independent, responsive Formula 1 fan dashboard built for static 
 - Championship trends, poles, fastest laps, podiums and recent-form analytics
 - Circuit Intelligence with historical venue records and derived track metrics
 - Live Race Weekend Center
+- Championship Scenario / Points Calculator
+- My F1 favorites dashboard with browser-local persistence
 
 ## Live Race Weekend Center (v1.5.0)
 
@@ -53,7 +55,7 @@ In GitHub:
 3. Select **main** and **/ (root)**.
 4. Save.
 
-The site uses versioned assets (`styles.css?v=1.5.0` and `app.js?v=1.5.0`) to reduce stale browser/GitHub Pages caching after deployment.
+The site uses versioned assets (`styles.css?v=1.7.0` and `app.js?v=1.7.0`) to reduce stale browser/GitHub Pages caching after deployment.
 
 ## Notes
 
@@ -65,3 +67,21 @@ F1 Pulse is an unofficial fan project and is not affiliated with Formula 1, FIA,
 - Season-synchronized points, wins, podiums, poles, fastest laps, average finish, best finish, and qualifying averages.
 - Round-by-round Grand Prix results and points, including Sprint points where available.
 - Direct links from comparison cards into existing driver and constructor profiles.
+
+
+## v1.7.0 — Scenario Calculator + My F1
+
+### Championship Scenario / Points Calculator
+- Compare two drivers in a hypothetical next-race result.
+- Set race finishing positions and Sprint positions when the focused weekend includes a Sprint.
+- Projects championship points and top-10 order immediately.
+- Shows position gains/losses and scenario points added.
+- Infers scoring from the selected season's published results rather than hard-coding one era.
+- Historical projections are labeled as estimates because dropped-score rules, half-points events, and other era-specific regulations can affect official championships.
+
+### My F1 Dashboard
+- Pin favorite drivers, constructors, and circuits.
+- Favorites persist in browser localStorage; no login or backend is required.
+- Favorites remain saved while switching seasons.
+- Current-season/selected-season standings and venue context appear when the favorite is present in that season.
+- Favorite cards open the existing driver, constructor, and Circuit Intelligence views.

@@ -7,7 +7,7 @@
   <meta name="description" content="F1 Pulse — current Formula 1 standings, results, winners, schedules and circuit information." />
   <title>F1 Pulse | Formula Racing Dashboard</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="styles.css?v=1.6.0" />
+  <link rel="stylesheet" href="styles.css?v=1.7.0" />
 </head>
 <body>
   <div class="noise" aria-hidden="true"></div>
@@ -23,6 +23,8 @@
       <button class="nav-link" data-view="teams">Constructors</button>
       <button class="nav-link" data-view="trends">Trends</button>
       <button class="nav-link" data-view="compare">Compare</button>
+      <button class="nav-link" data-view="scenario">Scenario</button>
+      <button class="nav-link" data-view="myf1">My F1</button>
       <button class="nav-link" data-view="winners">Winners</button>
       <button class="nav-link" data-view="calendar">Calendar</button>
       <button class="nav-link" data-view="circuits">Circuits</button>
@@ -149,6 +151,38 @@
       </section>
     </section>
 
+
+    <section class="view content-view" id="view-scenario" data-view-panel="scenario">
+      <div class="page-title"><div><p class="eyebrow">TITLE FIGHT LAB</p><h1>Championship Scenario Calculator</h1><p class="page-subtitle">Set hypothetical race and sprint finishes, then see how the selected season standings would move.</p></div><span class="season-chip" id="scenarioSeasonChip"></span></div>
+      <div class="scenario-layout">
+        <section class="analytics-panel scenario-control-panel">
+          <div class="analytics-panel-head"><div><p class="eyebrow">SCENARIO SETUP</p><h2>Build the next result</h2><p id="scenarioRaceLabel">Select competitors and finishing positions.</p></div><button class="ghost-btn small" id="scenarioReset" type="button">Reset</button></div>
+          <div class="scenario-fields">
+            <label><span>Driver A</span><select id="scenarioDriverA"></select></label>
+            <label><span>Race finish</span><select id="scenarioRaceA"></select></label>
+            <label class="scenario-sprint-field"><span>Sprint finish</span><select id="scenarioSprintA"></select></label>
+            <label><span>Driver B</span><select id="scenarioDriverB"></select></label>
+            <label><span>Race finish</span><select id="scenarioRaceB"></select></label>
+            <label class="scenario-sprint-field"><span>Sprint finish</span><select id="scenarioSprintB"></select></label>
+          </div>
+          <p class="intel-note" id="scenarioRuleNote"></p>
+        </section>
+        <section class="analytics-panel"><div class="analytics-panel-head compact"><div><p class="eyebrow">PROJECTED ORDER</p><h2>Championship impact</h2></div></div><div id="scenarioResults"><div class="skeleton tall"></div></div></section>
+      </div>
+    </section>
+
+    <section class="view content-view" id="view-myf1" data-view-panel="myf1">
+      <div class="page-title"><div><p class="eyebrow">YOUR PADDOCK</p><h1>My F1 Dashboard</h1><p class="page-subtitle">Pin favorite drivers, constructors and circuits. Favorites stay on this device in your browser.</p></div><span class="season-chip" id="myf1SeasonChip"></span></div>
+      <section class="analytics-panel favorites-add-panel">
+        <div class="favorites-add-grid">
+          <label><span>Add driver</span><div><select id="favoriteDriverSelect"></select><button type="button" data-add-favorite="driver">Pin</button></div></label>
+          <label><span>Add constructor</span><div><select id="favoriteTeamSelect"></select><button type="button" data-add-favorite="constructor">Pin</button></div></label>
+          <label><span>Add circuit</span><div><select id="favoriteCircuitSelect"></select><button type="button" data-add-favorite="circuit">Pin</button></div></label>
+        </div>
+      </section>
+      <div id="myF1Dashboard" class="myf1-grid"><div class="skeleton tall"></div></div>
+    </section>
+
     <section class="view content-view" id="view-winners" data-view-panel="winners">
       <div class="page-title"><div><p class="eyebrow">VICTORY LANE</p><h1>Race Winners</h1></div><span class="season-chip" id="winnerSeasonChip"></span></div>
       <div id="winnerGrid" class="winner-grid"><div class="skeleton tall"></div></div>
@@ -199,6 +233,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=1.6.0" defer></script>
+  <script src="app.js?v=1.7.0" defer></script>
 </body>
 </html>
